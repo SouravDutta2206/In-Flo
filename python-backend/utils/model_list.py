@@ -51,9 +51,11 @@ def get_gemini_models_list(api_key):
 
     for model in gemini_models_list:
         
-        if model == 'models/gemini-pro-vision':
+        if model == 'gemini-pro-vision':
             continue
-        if model.find('gemini-exp') != -1:
+        if model.find('exp') != -1:
+            continue
+        if model.find('preview') != -1:
             continue
         if re.search(r'-\d{3}$', model.split('-tuning')[0]):
             continue             
@@ -65,17 +67,15 @@ def get_gemini_models_list(api_key):
             filtered_models_data.append({'name': model, 'version': ver})
 
     all_versions_present = sorted(list(set(m['version'] for m in filtered_models_data)), reverse=True)
-    top_versions = all_versions_present[:2]
-    final_selection_data = [m for m in filtered_models_data if m['version'] in top_versions]
+    final_selection_data = [m for m in filtered_models_data if m['version'] in all_versions_present]
     final_selection_data.sort(key=lambda item: (
             item['version'],                       # Primary sort key: Version (descending due to reverse=True)
             get_sort_priority(item['name']), # Secondary sort key: Priority (ascending)
             item['name']                           # Tertiary sort key: Name (alphabetical ascending)
         ), reverse=True)
     gemini_sorted_list = [item['name'] for item in final_selection_data]
-    gemma_sorted_list = sorted(gemma_models_list, key=lambda x: int(x.split('-')[2][:-1]))
-    models_list = list(set(gemini_sorted_list)) + gemma_sorted_list
-    
+    models_list = list(set(gemini_sorted_list)) + gemma_models_list
+
     return models_list
 
 def get_groq_models_list(api_key):
@@ -92,5 +92,9 @@ def get_groq_models_list(api_key):
         model_list = models.get("data", [])
 
         return model_list
+
+if __name__ == "__main__":
+    api_key = "AIzaSyAMfR2iPgGgF6oGIM-iDlHTCz8t3nGTWUg"
+    print(get_gemini_models_list(api_key))
 
 

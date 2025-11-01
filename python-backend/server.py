@@ -16,7 +16,8 @@ from utils.model_list import get_gemini_models_list, get_groq_models_list
 from contextlib import asynccontextmanager
 from utils.schemas import ModelResponse, ModelRequest, ModelID, ChatRequest, Message, RequestState
 from utils.query_func import chat_ollama, chat_huggingface, chat_openrouter, chat_groq, chat_gemini
-
+from utils.web_search import web_search
+from utils.faiss import chunk_docs, faiss_search
 
 app = FastAPI(
     title="LLM Chat API",
@@ -51,124 +52,6 @@ async def format_chunk(content: str, model: str) -> str:
         "model": model
     }
     return f"data: {json.dumps(data)}\n\n"
-
-# def format_conversation_with_prompt(conversation: List[Message], web_search_bool: bool = False) -> List[Message]:
-#     # Format the last user message with the base prompt and return the updated conversation
-#     if not conversation:
-#         return conversation
-    
-#     history = conversation[:-1]
-#     last_message = conversation[-1]
-    
-#     if last_message.role != "user":
-#         return conversation
-    
-#     if web_search_bool:
-#         web_search_results , sources = asyncio.run(web_search(last_message.content))
-#     else:
-#         web_search_results = ""
-#         web_sources = []
-
-#     sources = []
-#     system_prompt = "" + web_search_results
-#     sources = sources + web_sources
-
-#     if system_prompt:
-#         formatted_prompt = prompt_with_context(context=web_search_results, query=last_message.content)
-#     else:
-#         formatted_prompt = base_prompt(last_message.content)
-
-#     formatted_message = Message(
-#         role="user",
-#         content=formatted_prompt[0]["content"]
-#     )
-    
-#     return history + [formatted_message] , sources
-
-async def run_web_search_and_get_context_async(prompt: str) -> str | None:
-    
-    script_name = "C4AI_web_search.py" # Make sure this filename is correct
-    script_path = os.path.join(os.getcwd(), "python-backend", "utils", script_name)
-
-    if not os.path.exists(script_path):
-        print(f"Error: The script '{script_path}' was not found.", file=sys.stderr)
-        return None
-
-    # Command arguments for asyncio.create_subprocess_exec
-    # The program itself (sys.executable) is the first argument here
-    command_args = [script_path, prompt]
-
-    print(f"Running command async: {sys.executable} {' '.join(command_args)}", file=sys.stderr)
-
-    process = None # Initialize process variable
-    try:
-        # Start the subprocess asynchronously
-        process = await asyncio.create_subprocess_exec(
-            sys.executable,             # Program to execute
-            *command_args,              # Arguments to the program
-            stdout=asyncio.subprocess.PIPE, # Capture stdout
-            stderr=asyncio.subprocess.PIPE, # Capture stderr
-            env=process_env             # Pass the modified environment
-        )
-
-        # Wait for the subprocess to complete and read stdout/stderr
-        # Set a timeout for the communication
-        timeout_seconds = 300
-        try:
-            stdout_data, stderr_data = await asyncio.wait_for(
-                process.communicate(), timeout=timeout_seconds
-            )
-        except asyncio.TimeoutError:
-            print(f"Error: Subprocess timed out after {timeout_seconds} seconds.", file=sys.stderr)
-            # Attempt to kill the process if it timed out
-            if process.returncode is None: # Check if it's still running
-                try:
-                    process.kill()
-                    await process.wait() # Ensure it's terminated
-                    print("Subprocess killed due to timeout.", file=sys.stderr)
-                except ProcessLookupError:
-                    print("Subprocess already finished before kill attempt.", file=sys.stderr) # Process finished between timeout and kill
-                except Exception as kill_err:
-                    print(f"Error trying to kill timed-out process: {kill_err}", file=sys.stderr)
-            return None # Return None on timeout
-
-        # Decode the output (assuming utf-8, handle potential errors)
-        stdout_str = stdout_data.decode('utf-8', errors='ignore').strip()
-        stderr_str = stderr_data.decode('utf-8', errors='ignore').strip()
-
-        # Check the return code AFTER communication is complete
-        if process.returncode == 0:
-            # Success! Print stderr if there was any (for debugging)
-            if stderr_str:
-                print("--- Subprocess stderr (async run) ---", file=sys.stderr)
-                print(stderr_str, file=sys.stderr)
-                print("--- End subprocess stderr (async run) ---", file=sys.stderr)
-            # Return the captured stdout
-            return stdout_str
-        else:
-            # The subprocess failed
-            print(f"Error: Subprocess failed with return code {process.returncode}", file=sys.stderr)
-            print(f"--- Subprocess stdout (if any) ---", file=sys.stderr)
-            print(stdout_str, file=sys.stderr) # Print captured stdout on failure
-            print(f"--- Subprocess stderr ---", file=sys.stderr)
-            print(stderr_str, file=sys.stderr) # Print captured stderr on failure
-            print(f"--- End subprocess error output ---", file=sys.stderr)
-            return None
-
-    except FileNotFoundError:
-        # This error happens if sys.executable itself is invalid
-        print(f"Error: Python interpreter '{sys.executable}' not found.", file=sys.stderr)
-        return None
-    except Exception as e:
-        # Catch other potential errors during process creation or communication
-        print(f"An unexpected error occurred during async subprocess execution: {e}", file=sys.stderr)
-        # Ensure process is cleaned up if it exists and hasn't finished
-        if process and process.returncode is None:
-             try:
-                 process.kill()
-                 await process.wait()
-             except Exception: pass # Ignore errors during cleanup after another error
-        return None
 
 def filter_conversation(conversation: List[Message]) -> List[Message]:
     # Filter out empty or invalid messages from the conversation
@@ -245,23 +128,27 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
     print(f"Web Search: {request.web_search}")
 
     history = request.conversation[:-1]
-    last_message = request.conversation[-1]
+    current_message = request.conversation[-1]
         
     if request.web_search:
-        web_search_results = await run_web_search_and_get_context_async(last_message.content)
+        web_results = await web_search(user_query=current_message.content)
+        if web_results:
+            web_results = chunk_docs(docs=web_results)
+            web_search_results = faiss_search(chunks=web_results, user_query=current_message.content)
+        else:
+            web_search_results = ""        
     else:
         web_search_results = ""
         # sources = []
 
     # sources = []
     system_prompt = web_search_results
-    print(web_search_results)
     # sources = sources + sources
 
     if system_prompt:
-        formatted_prompt = prompt_with_context(context=web_search_results, query=last_message.content)
+        formatted_prompt = prompt_with_context(context=web_search_results, query=current_message.content)
     else:
-        formatted_prompt = base_prompt(last_message.content)
+        formatted_prompt = base_prompt(current_message.content)
 
     formatted_message = Message(
         role="user",

@@ -28,7 +28,7 @@ def hf_local_embeddings(model_name):
         model_name=model_name,
         model_kwargs=model_kwargs,
         encode_kwargs=encode_kwargs,
-        cache_folder = os.path.join(os.getcwd(), "python-backend" , "hf_cache"),
+        cache_folder = os.path.join(os.getcwd(), "hf_cache"),
     )
 
     return embeddings
