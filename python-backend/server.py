@@ -131,7 +131,7 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
     current_message = request.conversation[-1]
         
     if request.web_search:
-        web_results = await web_search(user_query=current_message.content)
+        web_results = await web_search(user_query=current_message.content, tavily_api_key=request.tavily_api_key)
         if web_results:
             web_results = chunk_docs(docs=web_results)
             web_search_results = faiss_search(chunks=web_results, user_query=current_message.content)
@@ -139,11 +139,8 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
             web_search_results = ""        
     else:
         web_search_results = ""
-        # sources = []
-
-    # sources = []
+        
     system_prompt = web_search_results
-    # sources = sources + sources
 
     if system_prompt:
         formatted_prompt = prompt_with_context(context=web_search_results, query=current_message.content)

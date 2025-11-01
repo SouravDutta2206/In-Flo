@@ -19,6 +19,7 @@ class ChatRequest(BaseModel):
     conversation: List[Message]
     model: ModelInfo
     web_search: bool = False
+    tavily_api_key: str = ""
 
 class SourcePath(BaseModel):
     path: str

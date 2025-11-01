@@ -275,6 +275,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             key: key,
           },
           web_search: isSearchMode,
+          tavily_api_key: settings.providers.find(p => p.Provider === "Tavily")?.Key || "",
         }),
         signal: controller.signal,
       });

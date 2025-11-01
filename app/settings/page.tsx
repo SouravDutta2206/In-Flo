@@ -538,7 +538,43 @@ export default function SettingsPage() {
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Models are automatically loaded from OpenRouter's API
+                    Models are automatically loaded from Groq's API
+                  </p>
+                </div>
+              </div>
+              {/* Tavily Section */}
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="text-lg font-medium">Tavily API Key</h3>
+
+                <div className="space-y-2">
+                  <Label htmlFor="tavily-key">Key</Label>
+                  <div className="flex space-x-2">
+                    <Input
+                      id="tavily-key"
+                      type="password"
+                      value={getProviderConfig("Tavily").Key}
+                      onChange={(e) => updateProviderConfig("Tavily", "Key", e.target.value)}
+                      placeholder="tvly-...."
+                      className="rounded-xl flex-1 max-w-[80%]"
+                    />
+                    <Button 
+                      onClick={handleSave} disabled={isSaving}
+                      className="w-[20%] min-w-[100px] rounded-xl hover:bg-gray-300"
+                    >
+                      {isSaving ? (
+                        <span className="flex items-center">
+                          Saving
+                        </span>
+                      ) : (
+                        <span className="flex items-center">
+                          <Save className="mr-2 h-4 w-4" />
+                          Save
+                        </span>
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Tavily for web search results.
                   </p>
                 </div>
               </div>
