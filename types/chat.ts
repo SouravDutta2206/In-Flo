@@ -6,6 +6,7 @@ export interface ChatMessage {
   createdAt: string
   model?: string
   provider?: string
+  duration?: number
 }
 
 /** A persisted chat thread containing messages and metadata. */

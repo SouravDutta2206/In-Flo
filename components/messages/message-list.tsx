@@ -112,7 +112,20 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
                 <MessageContent content={message.content} isUser={message.role === "user"} />
               )}
               {editingMessageId !== message.id && (
-                <div className="text-xs opacity-100 text-muted-foreground mt-4">{format(new Date(message.createdAt), "HH:mm")}</div>
+                <div className="flex flex-col gap-1 mt-4">
+                  <div className="text-xs opacity-100 text-muted-foreground">{format(new Date(message.createdAt), "HH:mm")}</div>
+                  {message.role === "assistant" && (
+                    <div className="text-xs text-muted-foreground opacity-70">
+                      {Math.ceil(message.content.length / 4)} tokens
+                      {message.duration && (
+                        <>
+                          {` · ${(Math.ceil(message.content.length / 4) / (message.duration / 1000)).toFixed(1)} tokens/sec`}
+                          {` · Time-to-finish: ${(message.duration / 1000).toFixed(1)}s`}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
             

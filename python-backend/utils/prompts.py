@@ -43,7 +43,7 @@ def base_prompt(query_text: str):
                         
                         Format your response as follows:
                         1. If the question is about math, use LaTeX syntax, use $...$ for inline math and $$...$$ for display math.
-                        2. Follow the $...$ and $$...$$ syntax strictly, do not use any other syntax. like \( ... \) or \[ ... \]
+                        2. Follow the $...$ and $$...$$ syntax strictly, do not use any other syntax like \( ... \) or \[ ... \]
                         3. For code, use markdown code blocks with the language specified. Ensure proper indentation and formatting.
                         4. Organize your answer into paragraphs for readability and a clear progression of ideas.
                         5. Use bullet points or numbered lists where appropriate to break down complex information or present a series of related points.

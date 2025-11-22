@@ -200,6 +200,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     setCurrentChat(updatedChat)
 
     // Call API to get assistant response
+    const startTime = Date.now();
     try {
       const { key } = getApiKeyForModel(settings.activeModel || "")
       model = settings.activeModel || ""
@@ -270,12 +271,20 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       setCurrentChat(prevChat => prevChat ? { ...prevChat, messages: prevChat.messages.map((m) => m.id === tempMessage.id ? { ...m, content: accumulatedContent } : m) } : null)
 
       // Final update to persist in the database
-      await addMessageToChat(targetChat.id, {
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+
+      const persistedChat = await addMessageToChat(targetChat.id, {
         role: "assistant",
         content: accumulatedContent,
         model: model,
-        provider: provider
+        provider: provider,
+        duration: duration
       });
+
+      if (persistedChat) {
+        setCurrentChat(persistedChat);
+      }
 
       await loadChats();
     } catch (error: unknown) {
@@ -283,12 +292,20 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         console.log('Inference stopped by user');
         // Save the partial response if there is any
         if (accumulatedContent && targetChat) {
-          await addMessageToChat(targetChat.id, {
+          const endTime = Date.now();
+          const duration = endTime - startTime;
+          
+          const persistedChat = await addMessageToChat(targetChat.id, {
             role: "assistant",
             content: accumulatedContent,
             model: model,
-            provider: provider
+            provider: provider,
+            duration: duration
           });
+
+          if (persistedChat) {
+            setCurrentChat(persistedChat);
+          }
           await loadChats();
         }
       } else {
