@@ -1,3 +1,4 @@
+/** A single message in a chat conversation. */
 export interface ChatMessage {
   id: string
   role: "user" | "assistant" | "system"
@@ -7,6 +8,7 @@ export interface ChatMessage {
   provider?: string
 }
 
+/** A persisted chat thread containing messages and metadata. */
 export interface Chat {
   id: string
   title: string
@@ -16,12 +18,14 @@ export interface Chat {
   model?: string
 }
 
+/** Provider credentials and model list loaded from settings. */
 export interface ProviderConfig {
   Provider: string
   Key: string
   Models: string
 }
 
+/** App settings including provider configurations and active selection. */
 export interface Settings {
   providers: ProviderConfig[]
   activeModel?: string

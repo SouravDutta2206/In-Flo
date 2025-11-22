@@ -1,7 +1,11 @@
 import { NextRequest } from 'next/server'
 
+// Run this route on the Edge runtime to minimize latency for SSE proxying
 export const runtime = 'edge'
 
+/**
+ * Proxies chat requests to the Python backend and transparently streams SSE back to the client.
+ */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()

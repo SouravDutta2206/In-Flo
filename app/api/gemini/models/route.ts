@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// Edge runtime keeps latency low when proxying to Python backend
 export const runtime = 'edge'
 
+/**
+ * Validates presence of API key and forwards request to Python backend for Gemini models.
+ */
 export async function POST(req: NextRequest) {
     try {
       const body = await req.json();

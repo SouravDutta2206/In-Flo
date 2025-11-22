@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react"
 
+/**
+ * Returns true on viewport widths below the mobile breakpoint (768px).
+ */
 export const useMobile = () => {
   const [isMobile, setIsMobile] = useState(false)
 

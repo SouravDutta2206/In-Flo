@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import ollama from 'ollama';
 
+/**
+ * Returns locally available Ollama models via server-side ollama client.
+ */
 export async function GET() {
   try {
     const models = await ollama.list();

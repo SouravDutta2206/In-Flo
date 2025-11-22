@@ -1,5 +1,5 @@
 import { Code, Sparkles, Book, Compass } from "lucide-react"
-import { Button } from "./ui/button"
+import { Button } from "../ui/button"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 

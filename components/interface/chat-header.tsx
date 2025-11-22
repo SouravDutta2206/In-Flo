@@ -11,6 +11,9 @@ interface ChatHeaderProps {
   sidebarOpen: boolean
 }
 
+/**
+ * ChatHeader shows the conversation title, a mobile sidebar toggle, and a delete action.
+ */
 export function ChatHeader({ toggleSidebar, sidebarOpen }: ChatHeaderProps) {
   const isMobile = useMobile()
   const { currentChat, deleteCurrentChat } = useChat()

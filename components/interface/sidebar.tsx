@@ -12,6 +12,9 @@ interface SidebarProps {
   onClose: () => void
 }
 
+/**
+ * Sidebar lists conversations and provides entrypoints to create, select, and remove chats.
+ */
 export function Sidebar({ onClose }: SidebarProps) {
   const { chats, currentChat, createNewChat, selectChat, deleteChatById } = useChat()
   const isMobile = useMobile()
@@ -22,16 +25,19 @@ export function Sidebar({ onClose }: SidebarProps) {
     setMounted(true)
   }, [])
 
+  // Create a new chat and close the drawer on mobile
   const handleNewChat = async () => {
     await createNewChat()
     if (isMobile) onClose()
   }
 
+  // Select a chat and close the drawer on mobile
   const handleSelectChat = async (id: string) => {
     await selectChat(id)
     if (isMobile) onClose()
   }
 
+  // Navigate to settings and close the drawer on mobile
   const handleSettings = () => {
     router.push("/settings")
     if (isMobile) onClose()
@@ -76,7 +82,10 @@ export function Sidebar({ onClose }: SidebarProps) {
                 onClick={() => handleSelectChat(chat.id)}
               >
                 <MessageSquare className="mr-2 h-4 w-4 shrink-0" />
-                <span className="truncate">{chat.title = chat.title.slice(0, 15) + (chat.title.length > 15 ? "..." : "")}</span>
+                {(() => {
+                  const displayedTitle = chat.title.slice(0, 15) + (chat.title.length > 15 ? "..." : "");
+                  return <span className="truncate">{displayedTitle}</span>;
+                })()}
               </div>
               <Button
                 variant="ghost"

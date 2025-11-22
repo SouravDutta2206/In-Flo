@@ -6,15 +6,18 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Copy, Loader2, Check, Pencil, Trash2 } from "lucide-react"
 import { format } from "date-fns"
-import { MessageContent } from "@/components/message-content"
+import { MessageContent } from "@/components/messages/content/message-content"
 import { useChat } from "@/context/chat-context"
-import { EditMessageInput } from "./edit-message-input"
+import { EditMessageInput } from "@/components/input-box/edit-message-input"
 
 interface MessageListProps {
   messages: ChatMessage[]
   isLoading: boolean
 }
 
+/**
+ * MessageList renders the chat transcript, supports copy/edit/delete actions, and manages scroll.
+ */
 export function MessageList({ messages, isLoading }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { editAndResendMessage, deleteMessagePair, currentChat } = useChat()
@@ -24,27 +27,29 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
   const scrollLockRef = useRef(false)
 
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, 100)
+  }
+
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Separate effect for initial scroll
+  // Initial scroll
   useEffect(() => {
     if (mounted && messages.length > 0) {
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
+      scrollToBottom()
     }
-  }, [mounted, messages.length]);
+  }, [mounted, messages.length])
 
-  // Effect for handling message updates and loading states
+  // Scroll on updates unless user scrolled up
   useEffect(() => {
     if (!scrollLockRef.current && messagesEndRef.current) {
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
+      scrollToBottom()
     }
-  }, [messages, isLoading]);
+  }, [messages, isLoading])
 
   // Handle scroll events to determine if user has scrolled up
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -111,56 +116,19 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
               )}
             </div>
             
-            <div className={cn("flex items-center mt-1 space-x-1")}>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className={cn(
-                  "z-50 h-10 w-10 rounded-xl opacity-0 hover:opacity-100 hover:bg-muted transition-opacity duration-200",
-                  (hoveredMessageId === message.id || copiedMessageId === message.id) ? "opacity-100" : "opacity-0",
-                  message.role === "assistant" ? "ml-3" : ""
-                )}
-                onClick={() => {
+            <div className={cn("flex items-center mt-1 space-x-1")}> 
+              <MessageActions
+                role={message.role}
+                isHovered={hoveredMessageId === message.id}
+                isCopied={copiedMessageId === message.id}
+                onCopy={() => {
                   navigator.clipboard.writeText(message.content)
                   setCopiedMessageId(message.id)
                   setTimeout(() => setCopiedMessageId(null), 1000)
                 }}
-              >
-                {copiedMessageId === message.id ? (
-                  <Check className="h-4 w-4" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-              </Button>
-
-              {message.role === 'user' && (
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className={cn(
-                    "z-50 h-10 w-10 rounded-xl opacity-0 hover:opacity-100 hover:bg-muted transition-opacity duration-200",
-                    hoveredMessageId === message.id ? "opacity-100" : "opacity-0"
-                  )}
-                  onClick={() => {
-                    setEditingMessageId(message.id)
-                  }}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-              )}
-
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className={cn(
-                  "z-50 h-10 w-10 rounded-xl opacity-0 hover:opacity-100 hover:bg-muted transition-opacity duration-200",
-                  hoveredMessageId === message.id ? "opacity-100" : "opacity-0"
-                )}
-                onClick={() => deleteMessagePair(message.id)}
-                title="Delete Message Pair"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+                onEdit={() => setEditingMessageId(message.id)}
+                onDelete={() => deleteMessagePair(message.id)}
+              />
             </div>
           </div>
         ))
@@ -176,6 +144,66 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
 
       <div ref={messagesEndRef} />
     </div>
+  )
+}
+
+function MessageActions({
+  role,
+  isHovered,
+  isCopied,
+  onCopy,
+  onEdit,
+  onDelete,
+}: {
+  role: "user" | "assistant" | "system"
+  isHovered: boolean
+  isCopied: boolean
+  onCopy: () => void
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        className={cn(
+          "z-50 h-10 w-10 rounded-xl opacity-0 hover:opacity-100 hover:bg-muted transition-opacity duration-200",
+          isHovered || isCopied ? "opacity-100" : "opacity-0",
+          role === "assistant" ? "ml-3" : ""
+        )}
+        onClick={onCopy}
+      >
+        {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+      </Button>
+
+      {role === "user" && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn(
+            "z-50 h-10 w-10 rounded-xl opacity-0 hover:opacity-100 hover:bg-muted transition-opacity duration-200",
+            isHovered ? "opacity-100" : "opacity-0"
+          )}
+          onClick={onEdit}
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
+      )}
+
+      <Button
+        variant="ghost"
+        size="icon"
+        className={cn(
+          "z-50 h-10 w-10 rounded-xl opacity-0 hover:opacity-100 hover:bg-muted transition-opacity duration-200",
+          isHovered ? "opacity-100" : "opacity-0"
+        )}
+        onClick={onDelete}
+        title="Delete Message Pair"
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
+    </>
   )
 }
 

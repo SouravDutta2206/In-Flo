@@ -9,7 +9,17 @@ const DATA_DIR = path.join(process.cwd(), "data")
 const CHATS_DIR = path.join(DATA_DIR, "chats")
 const SETTINGS_FILE = path.join(process.cwd(), "data","app_config.json")
 
-// Ensure directories exist
+// Small helpers for JSON IO
+async function readJson<T>(filePath: string): Promise<T> {
+  const content = await fs.readFile(filePath, "utf-8")
+  return JSON.parse(content) as T
+}
+
+async function writeJson(filePath: string, data: unknown) {
+  await fs.writeFile(filePath, JSON.stringify(data, null, 2))
+}
+
+// Ensure directories exist on disk for chats/settings persistence
 async function ensureDirectories() {
   try {
     await fs.mkdir(DATA_DIR, { recursive: true })
@@ -19,7 +29,7 @@ async function ensureDirectories() {
   }
 }
 
-// Get all chats
+/** Return all chats sorted by updatedAt desc. */
 export async function getChats(): Promise<Chat[]> {
   await ensureDirectories()
 
@@ -28,10 +38,7 @@ export async function getChats(): Promise<Chat[]> {
     const chatFiles = files.filter((file) => file.endsWith(".json"))
 
     const chats = await Promise.all(
-      chatFiles.map(async (file) => {
-        const content = await fs.readFile(path.join(CHATS_DIR, file), "utf-8")
-        return JSON.parse(content) as Chat
-      }),
+      chatFiles.map(async (file) => readJson<Chat>(path.join(CHATS_DIR, file)))
     )
 
     return chats.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
@@ -41,18 +48,17 @@ export async function getChats(): Promise<Chat[]> {
   }
 }
 
-// Get a single chat by ID
+/** Return a single chat by id or null if missing. */
 export async function getChatById(id: string): Promise<Chat | null> {
   try {
-    const content = await fs.readFile(path.join(CHATS_DIR, `${id}.json`), "utf-8")
-    return JSON.parse(content) as Chat
+    return await readJson<Chat>(path.join(CHATS_DIR, `${id}.json`))
   } catch (error) {
     console.error(`Error reading chat ${id}:`, error)
     return null
   }
 }
 
-// Create a new chat
+/** Create and persist a new chat file. */
 export async function createChat(title = "New Chat"): Promise<Chat> {
   await ensureDirectories()
 
@@ -64,21 +70,21 @@ export async function createChat(title = "New Chat"): Promise<Chat> {
     updatedAt: new Date().toISOString(),
   }
 
-  await fs.writeFile(path.join(CHATS_DIR, `${newChat.id}.json`), JSON.stringify(newChat, null, 2))
+  await writeJson(path.join(CHATS_DIR, `${newChat.id}.json`), newChat)
 
   return newChat
 }
 
-// Update a chat
+/** Persist chat changes and bump updatedAt. */
 export async function updateChat(chat: Chat): Promise<Chat> {
   chat.updatedAt = new Date().toISOString()
 
-  await fs.writeFile(path.join(CHATS_DIR, `${chat.id}.json`), JSON.stringify(chat, null, 2))
+  await writeJson(path.join(CHATS_DIR, `${chat.id}.json`), chat)
 
   return chat
 }
 
-// Delete a chat
+/** Delete a chat file by id. */
 export async function deleteChat(id: string): Promise<boolean> {
   try {
     await fs.unlink(path.join(CHATS_DIR, `${id}.json`))
@@ -89,7 +95,7 @@ export async function deleteChat(id: string): Promise<boolean> {
   }
 }
 
-// Add a message to a chat
+/** Append a message to a chat; derives title from first user message. */
 export async function addMessageToChat(
   chatId: string,
   message: Omit<ChatMessage, "id" | "createdAt">,
@@ -120,11 +126,10 @@ export async function addMessageToChat(
   return chat
 }
 
-// Get settings
+/** Read provider settings (and optional active model/provider) from app_config.json. */
 export async function getSettings(): Promise<Settings> {
   try {
-    const content = await fs.readFile(SETTINGS_FILE, "utf-8")
-    const providers = JSON.parse(content) as ProviderConfig[]
+    const providers = await readJson<ProviderConfig[]>(SETTINGS_FILE)
 
     return {
       providers,
@@ -139,10 +144,10 @@ export async function getSettings(): Promise<Settings> {
   }
 }
 
-// Update settings
+/** Persist provider settings to app_config.json. */
 export async function updateSettings(settings: Settings): Promise<Settings> {
   try {
-    await fs.writeFile(SETTINGS_FILE, JSON.stringify(settings.providers, null, 2))
+    await writeJson(SETTINGS_FILE, settings.providers)
     return settings
   } catch (error) {
     console.error("Error updating settings:", error)

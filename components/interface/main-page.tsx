@@ -1,14 +1,17 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Sidebar } from "@/components/sidebar"
-import { ChatHeader } from "@/components/chat-header"
-import { MessageList } from "@/components/message-list"
-import { WelcomeScreen } from "@/components/welcome-screen"
+import { Sidebar } from "@/components/interface/sidebar"
+import { ChatHeader } from "@/components/interface/chat-header"
+import { MessageList } from "@/components/messages/message-list"
+import { WelcomeScreen } from "@/components/interface/welcome-screen"
 import { useMobile } from "@/hooks/use-mobile"
 import { useChat } from "@/context/chat-context"
-import { ChatInput } from "@/components/chat-input"
+import { ChatInput } from "@/components/input-box/chat-input"
 
+/**
+ * ChatInterface composes the overall layout: sidebar, header, message list, and input.
+ */
 export default function ChatInterface() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [input, setInput] = useState("")
@@ -16,8 +19,10 @@ export default function ChatInterface() {
   const isMobile = useMobile()
   const { currentChat, isLoading } = useChat()
 
+  // Toggle the sidebar on mobile
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen)
 
+  // Prefill the input when clicking a suggested sentence
   const handleSentenceClick = (sentence: string) => {
     setInput(sentence);
   };

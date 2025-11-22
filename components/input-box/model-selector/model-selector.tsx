@@ -8,8 +8,15 @@ import { Button } from "@/components/ui/button"
 import Image from 'next/image'
 import { Input } from "@/components/ui/input"
 import { Model, OllamaListResponse, ModelResponse, GroupedModels, LogoProvider } from "@/types/models"
+import { resolveModelLogoPath, resolveProviderLogoPath } from "@/lib/model-logos"
+import { SearchBar } from "@/components/input-box/model-selector/SearchBar"
+import { ProviderTabs } from "@/components/input-box/model-selector/ProviderTabs"
 
 
+/**
+ * ModelSelector lets users choose a model across providers, with search and pinning.
+ * It aggregates models from settings and provider APIs, preserving current UI/UX.
+ */
 export function ModelSelector() {
   const {settings, updateChatSettings } = useChat()
   const [isOpen, setIsOpen] = useState(false)
@@ -22,6 +29,7 @@ export function ModelSelector() {
   const [searchTerm, setSearchTerm] = useState("") // State for search term
   const [pinnedModels, setPinnedModels] = useState<string[]>([]) // State for pinned models
 
+  // Initial mount: load pinned models and logo map
   useEffect(() => {
     setMounted(true)
     // Load pinned models from localStorage
@@ -58,37 +66,17 @@ export function ModelSelector() {
     fetchLogos();
   }, [])
 
-  // Function to find logo path based on name
-  const findLogoPath = (name: string): string | null => {
-    const lowerCaseName = name.toLowerCase();
-    let foundPath: string | null = null;
-
-    for (const logoProvider of logoMap) {
-      if (lowerCaseName.includes(logoProvider.name.toLowerCase())) {
-        foundPath = logoProvider.path;
-        break; // Found a match, stop searching
-      }
-    }
-
-    if (foundPath) {
-      // Ensure path starts with '/' and remove 'public/'
-      let relativePath = foundPath.startsWith('public/') ? foundPath.substring('public/'.length) : foundPath;
-      if (!relativePath.startsWith('/')) {
-        relativePath = '/' + relativePath;
-      }
-      return relativePath;
-    }
-
-    return null; // Return null if no logo found
-  };
+  // Logo resolution delegated to helper utils
 
   // Effect to save pinned models to localStorage whenever they change
+  // Persist pinned models after initial mount
   useEffect(() => {
     if (mounted) { // Only save after initial mount and load
       localStorage.setItem("pinnedModels", JSON.stringify(pinnedModels));
     }
   }, [pinnedModels, mounted]);
 
+  /** Fetch models from the local Ollama endpoint. */
   const fetchOllamaModels = async (): Promise<Model[]> => {
     try {
       const response = await fetch('/api/ollama/models');
@@ -107,6 +95,7 @@ export function ModelSelector() {
     }
   };
 
+  /** Fetch models from OpenRouter endpoint; requires server to expose proxy. */
   const fetchOpenRouterModels = async (): Promise<Model[]> => {
     try {
       const response = await fetch('/api/openrouter/models');
@@ -125,6 +114,7 @@ export function ModelSelector() {
     }
   };
 
+  /** Fetch models from Groq; requires API key in settings. */
   const fetchGroqModels = async (): Promise<Model[]> => {
 
     const groqProvider = settings.providers.find(p => p.Provider === "Groq");
@@ -160,6 +150,7 @@ export function ModelSelector() {
     }
   };
 
+  /** Fetch models from Gemini; requires API key in settings. */
   const fetchGeminiModels = async (): Promise<Model[]> => {
     // Get the Gemini API key from settings
     const geminiProvider = settings.providers.find(p => p.Provider === "Gemini");
@@ -198,6 +189,7 @@ export function ModelSelector() {
     }
   };
 
+  // Aggregate models from settings + providers and initialize tabs/selection
   useEffect(() => {
     const loadAllModels = async () => {
       const settingsModels: Model[] = [];
@@ -273,6 +265,7 @@ export function ModelSelector() {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [isOpen])
 
+  // Select a model and persist in chat settings
   const handleSelectModel = (model: Model) => {
     setSelectedModel(model.name);
     const updatedSettings = {
@@ -285,6 +278,7 @@ export function ModelSelector() {
   };
 
   // Function to toggle pin status of a model
+  // Pin/unpin a model without selecting it
   const handleTogglePin = (modelName: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent selecting the model when clicking the pin
     setPinnedModels(prevPinned => {
@@ -344,16 +338,9 @@ export function ModelSelector() {
           }}
         >
           {/* Left Side: Container for Search + List */}          
-          <div className="flex-1 flex flex-col bg-muted max-w-[80%]"> {/* flex-1 takes width, flex-col stacks items */}
-            {/* Search Bar (Stays at top) */}            
-            <div className="p-2 border-b border-gray-700 flex-shrink-0">
-              <Input 
-                placeholder="Search models..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-[#35373c] border-gray-600 focus:ring-blue-500 focus:border-blue-500 text-gray-100"
-              />
-            </div>
+          <div className="flex-1 min-w-0 flex flex-col bg-muted"> {/* flex-1 takes width, flex-col stacks items */}
+            {/* Search Bar (Stays at top) */}
+            <SearchBar value={searchTerm} onChange={setSearchTerm} />
 
             {/* Scrollable Model List Area */}            
             <div className="flex-1 overflow-y-auto"> {/* flex-1 takes height, scrollable */}              
@@ -369,23 +356,7 @@ export function ModelSelector() {
                 const regular = filteredModels.filter(model => !pinnedModels.includes(model.name));
 
                 const renderModelItem = (model: Model, index: number) => {
-                  let logoPath = findLogoPath(model.name);
-                  if (!logoPath) {
-                    const lowerProvider = model.provider.toLowerCase();
-                    if (lowerProvider.includes('google') || lowerProvider.includes('gemini')) {
-                      logoPath = '/google.svg';
-                    } else if (lowerProvider.includes('ollama')) {
-                      logoPath = '/ollama.svg';
-                    } else if (lowerProvider.includes('huggingface')) {
-                      logoPath = '/huggingface.svg';
-                    } else if (lowerProvider.includes('openrouter')) {
-                      logoPath = '/openrouter.svg';
-                    } else if (lowerProvider.includes('groq')) {
-                      logoPath = '/groq.svg';
-                    } else {
-                      logoPath = null;
-                    }
-                  }
+                  const logoPath = resolveModelLogoPath(model.name, model.provider, logoMap);
                   const isPinned = pinnedModels.includes(model.name);
 
                   return (
@@ -461,60 +432,15 @@ export function ModelSelector() {
             </div> {/* End Scrollable Model List Area */}            
           </div> {/* End Left Side */}          
 
-          {/* Right Side: Provider Tabs */}          
-          <div className="w-35 flex-shrink-0 bg-[#1e1f22] border-l border-gray-700 overflow-y-auto">
-            {providers.map(provider => {
-              // Hardcode provider logo paths
-              let providerLogoPath: string | null = null;
-              const lowerProvider = provider.toLowerCase();
-              if (lowerProvider.includes('google') || lowerProvider.includes('gemini')) {
-                providerLogoPath = '/google.svg'; // Assuming gemini.svg exists in public/
-              } else if (lowerProvider.includes('ollama')) {
-                providerLogoPath = '/ollama.svg'; // Assuming ollama.svg exists in public/
-              } else if (lowerProvider.includes('huggingface')) {
-                providerLogoPath = '/huggingface.svg'; // Assuming huggingface.svg exists in public/
-              } else if (lowerProvider.includes('openrouter')) {
-                providerLogoPath = '/openrouter.svg'; // Assuming openrouter.svg exists in public/
-              } else if (lowerProvider.includes('groq')) {
-                providerLogoPath = '/groq.svg'; // Assuming groq.svg exists in public/
-              }
-              // Add more providers here if needed
-
-              return (
-                <button
-                  key={provider}
-                  className={cn(
-                    "w-full px-3 py-2.5 text-left text-sm font-medium flex items-center",
-                    activeTab === provider
-                      ? "bg-[#35373c] text-white"
-                      : "text-gray-400 hover:bg-[#2b2d31] hover:text-gray-200"
-                  )}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setActiveTab(provider);
-                    setSearchTerm(""); // Reset search term on tab change
-                  }}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }}
-                >
-                  {/* Render logo if path exists */}
-                  {providerLogoPath && (
-                    <Image 
-                      src={providerLogoPath} 
-                      alt={`${provider} logo`} 
-                      width={16} 
-                      height={16} 
-                      className="mr-2 flex-shrink-0"
-                    />
-                  )}
-                  {provider}
-                </button>
-              );
-            })}
-          </div>
+          {/* Right Side: Provider Tabs */}
+          <ProviderTabs
+            providers={providers}
+            active={activeTab}
+            onSelect={(p) => {
+              setActiveTab(p)
+              setSearchTerm("")
+            }}
+          />
         </div>
       )}
     </div>

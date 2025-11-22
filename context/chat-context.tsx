@@ -14,6 +14,8 @@ import {
   updateChat,
 } from "@/app/actions/chat-actions"
 import { v4 as uuidv4 } from "uuid"
+import { getApiKeyForModel as _getApiKeyForModel, getProviderForModel as _getProviderForModel } from "@/lib/settings"
+import { streamSSE } from "@/lib/stream"
 
 // Local storage key
 const SETTINGS_CACHE_KEY = "chat_app_settings"
@@ -38,8 +40,13 @@ interface ChatContextType {
   setIsSearchMode: (value: boolean) => void
 }
 
+// React context containing chat state, settings, and chat operations
 const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
+/**
+ * ChatProvider owns chat state, settings, and network interactions.
+ * It exposes CRUD for chats and messages, streaming send, and settings updates.
+ */
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [chats, setChats] = useState<Chat[]>([])
   const [currentChat, setCurrentChat] = useState<Chat | null>(null)
@@ -48,160 +55,97 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [abortController, setAbortController] = useState<AbortController | null>(null)
   const [isSearchMode, setIsSearchMode] = useState(false)
 
+  // Helpers
+  const withLoading = async <T,>(fn: () => Promise<T>): Promise<T> => {
+    setIsLoading(true)
+    try {
+      return await fn()
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const getTavilyKey = (): string => settings.providers.find(p => p.Provider === "Tavily")?.Key || ""
+
   // Load chats and settings on mount
   useEffect(() => {
-    const initialize = async () => {
-      setIsLoading(true)
-      try {
-        const loadedChats = await getChats()
-        setChats(loadedChats)
+    const initialize = async () => withLoading(async () => {
+      const loadedChats = await getChats()
+      setChats(loadedChats)
 
-        if (loadedChats.length > 0) {
-          const chat = await getChatById(loadedChats[0].id)
-          setCurrentChat(chat)
-        }
-
-        // Try to load settings from localStorage first
-        const cachedSettings = localStorage.getItem(SETTINGS_CACHE_KEY)
-
-        if (cachedSettings) {
-          try {
-            setSettings(JSON.parse(cachedSettings))
-          } catch (error) {
-            console.error("Error parsing cached settings:", error)
-            // If error parsing cache, load from file
-            const fileSettings = await getSettings()
-            setSettings(fileSettings)
-          }
-        } else {
-          // If no cache, load from file
-          const fileSettings = await getSettings()
-          setSettings(fileSettings)
-        }
-      } catch (error) {
-        console.error("Error initializing chat context:", error)
-      } finally {
-        setIsLoading(false)
+      if (loadedChats.length > 0) {
+        const chat = await getChatById(loadedChats[0].id)
+        setCurrentChat(chat)
       }
-    }
+
+      // Try to load settings from localStorage first
+      const cachedSettings = localStorage.getItem(SETTINGS_CACHE_KEY)
+      if (cachedSettings) {
+        try {
+          setSettings(JSON.parse(cachedSettings))
+          return
+        } catch (error) {
+          console.error("Error parsing cached settings:", error)
+        }
+      }
+
+      const fileSettings = await getSettings()
+      setSettings(fileSettings)
+    })
 
     initialize()
   }, [])
 
-  const loadChats = async () => {
-    setIsLoading(true)
-    try {
-      const loadedChats = await getChats()
-      setChats(loadedChats)
-    } catch (error) {
-      console.error("Error loading chats:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  /** Reload chats from storage and update local state. */
+  const loadChats = async () => withLoading(async () => {
+    const loadedChats = await getChats()
+    setChats(loadedChats)
+  })
 
-  const selectChat = async (id: string) => {
-    setIsLoading(true)
-    try {
-      const chat = await getChatById(id)
-      setCurrentChat(chat)
-    } catch (error) {
-      console.error(`Error selecting chat ${id}:`, error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  /** Select a chat by id and load it into state. */
+  const selectChat = async (id: string) => withLoading(async () => {
+    const chat = await getChatById(id)
+    setCurrentChat(chat)
+  })
 
-  const createNewChat = async () => {
-    setIsLoading(true)
-    try {
-      const newChat = await createChat()
-      setChats((prev) => [newChat, ...prev])
-      setCurrentChat(newChat)
-      return newChat
-    } catch (error) {
-      console.error("Error creating new chat:", error)
-      throw error
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  /** Create a new chat and set it as current. */
+  const createNewChat = async () => withLoading(async () => {
+    const newChat = await createChat()
+    setChats((prev) => [newChat, ...prev])
+    setCurrentChat(newChat)
+    return newChat
+  })
 
+  /** Delete the currently selected chat and pick the next available one if any. */
   const deleteCurrentChat = async () => {
     if (!currentChat) return
 
-    setIsLoading(true)
-    try {
+    await withLoading(async () => {
       await deleteChat(currentChat.id)
-      setChats((prev) => prev.filter((chat) => chat.id !== currentChat.id))
-
-      if (chats.length > 1) {
-        const nextChat = chats.find((chat) => chat.id !== currentChat.id)
-        if (nextChat) {
-          const chat = await getChatById(nextChat.id)
-          setCurrentChat(chat)
-        } else {
-          setCurrentChat(null)
-        }
-      } else {
-        setCurrentChat(null)
-      }
-    } catch (error) {
-      console.error(`Error deleting chat ${currentChat.id}:`, error)
-    } finally {
-      setIsLoading(false)
-    }
+      const remaining = chats.filter((c) => c.id !== currentChat.id)
+      setChats(remaining)
+      const next = remaining[0] ? await getChatById(remaining[0].id) : null
+      setCurrentChat(next)
+    })
   }
 
   // Function to delete a specific chat by its ID
-  const deleteChatById = async (id: string) => {
-    setIsLoading(true)
-    try {
-      await deleteChat(id)
-      const remainingChats = chats.filter((chat) => chat.id !== id)
-      setChats(remainingChats)
-
-      // If the deleted chat was the current one, select the next available chat
-      if (currentChat?.id === id) {
-        if (remainingChats.length > 0) {
-          const nextChat = await getChatById(remainingChats[0].id)
-          setCurrentChat(nextChat)
-        } else {
-          setCurrentChat(null)
-        }
-      }
-    } catch (error) {
-      console.error(`Error deleting chat ${id}:`, error)
-    } finally {
-      setIsLoading(false)
+  /** Delete a specific chat by id, updating current chat if necessary. */
+  const deleteChatById = async (id: string) => withLoading(async () => {
+    await deleteChat(id)
+    const remaining = chats.filter((c) => c.id !== id)
+    setChats(remaining)
+    if (currentChat?.id === id) {
+      const next = remaining[0] ? await getChatById(remaining[0].id) : null
+      setCurrentChat(next)
     }
-  }
+  })
 
   // Helper function to get API key for the current model
-  const getApiKeyForModel = (modelName: string): { key: string } => {
-    // If we have an activeProvider in settings and it matches the current model, get the key from the provider config
-    if (settings.activeModel === modelName && settings.activeProvider) {
-      const provider = settings.providers.find(p => p.Provider.toLowerCase() === settings.activeProvider?.toLowerCase());
-      if (provider) {
-        return { key: provider.Key };
-      }
-    }
+  /** Resolve an API key for the given model from settings. */
+  const getApiKeyForModel = (modelName: string): { key: string } => ({ key: _getApiKeyForModel(settings, modelName) })
 
-    // Otherwise, try to find provider in the settings
-    for (const provider of settings.providers) {
-      const models = provider.Models.split(",").map((m) => m.trim())
-
-      if (models.includes(modelName)) {
-        return { key: provider.Key }
-      }
-    }
-
-    // Default to first provider if no match
-    return {
-      key: settings.providers[0]?.Key || "",
-    }
-  }
-
+  /** Abort the currently running generation stream, if any. */
   const stopInference = () => {
     if (abortController) {
       abortController.abort();
@@ -209,6 +153,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  /**
+   * Send a user message, then stream assistant tokens via SSE and persist the final message.
+   * Maintains a temporary streaming message in state for a responsive UI.
+   */
   const sendMessage = async (content: string) => {
     // Don't process empty or undefined content
     if (!content || content === "") {
@@ -218,10 +166,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     // Abort any existing inference
     stopInference();
 
-    let targetChat = currentChat;
-    let accumulatedContent = "";
-    let model = "";
-    let provider = "";
+    let targetChat = currentChat
+    let accumulatedContent = ""
+    let model = ""
+    let provider = ""
     
     // If no current chat, create a new one
     if (!targetChat) {
@@ -249,13 +197,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    setCurrentChat(updatedChat);
+    setCurrentChat(updatedChat)
 
     // Call API to get assistant response
     try {
-      const { key } = getApiKeyForModel(settings.activeModel || "");
-      model = settings.activeModel || "";
-      provider = getProviderForModel(model);
+      const { key } = getApiKeyForModel(settings.activeModel || "")
+      model = settings.activeModel || ""
+      provider = getProviderForModel(model)
 
       // Create new abort controller for this request
       const controller = new AbortController();
@@ -275,7 +223,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             key: key,
           },
           web_search: isSearchMode,
-          tavily_api_key: settings.providers.find(p => p.Provider === "Tavily")?.Key || "",
+          tavily_api_key: getTavilyKey(),
         }),
         signal: controller.signal,
       });
@@ -284,91 +232,42 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         throw new Error("Failed to get response from API");
       }
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (!reader) {
-        throw new Error("No reader available");
-      }
-
-      let assistantMessage: Omit<ChatMessage, "id" | "createdAt"> = {
-        role: "assistant",
-        content: "",
-        model: model,
-        provider: provider
-      };
-
       // Create a temporary message object for streaming
       const tempMessage: ChatMessage = {
-        ...assistantMessage,
+        role: "assistant",
+        content: "",
+        model,
+        provider,
         id: uuidv4(),
-        createdAt: new Date().toISOString()
-      };
-
-      // Add the temporary message to the current chat state
-      const initialMessages = [...updatedChat.messages, tempMessage];
-      const initialChatState = {
-        ...updatedChat,
-        messages: initialMessages
-      };
-      setCurrentChat(initialChatState);
-
-      let lastUpdateTime = Date.now();
-      const UPDATE_INTERVAL = 100;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split("\n");
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              accumulatedContent += data.content;
-              
-              // Only update the UI if enough time has passed
-              const currentTime = Date.now();
-              if (currentTime - lastUpdateTime >= UPDATE_INTERVAL) {
-                setCurrentChat(prevChat => {
-                  if (!prevChat) return null;
-                  
-                  const updatedMessages = prevChat.messages.map((msg: ChatMessage) => 
-                    msg.id === tempMessage.id 
-                      ? { ...msg, content: accumulatedContent }
-                      : msg
-                  );
-
-                  return {
-                    ...prevChat,
-                    messages: updatedMessages,
-                  };
-                });
-                lastUpdateTime = currentTime;
-              }
-            } catch (e) {
-              console.error("Error parsing SSE data:", e);
-            }
-          }
-        }
+        createdAt: new Date().toISOString(),
       }
 
-      setCurrentChat(prevChat => {
-        if (!prevChat) return null;
-        
-        const updatedMessages = prevChat.messages.map((msg: ChatMessage) => 
-          msg.id === tempMessage.id 
-            ? { ...msg, content: accumulatedContent }
-            : msg
-        );
+      // Add the temporary message to the current chat state
+      setCurrentChat({ ...updatedChat, messages: [...updatedChat.messages, tempMessage] })
 
-        return {
-          ...prevChat,
-          messages: updatedMessages,
-        };
-      });
+      let lastUpdateTime = Date.now()
+      const UPDATE_INTERVAL = 100
+
+      const updateTempContent = (content: string) => {
+        setCurrentChat(prevChat => {
+          if (!prevChat) return null
+          const updatedMessages = prevChat.messages.map((msg: ChatMessage) =>
+            msg.id === tempMessage.id ? { ...msg, content } : msg
+          )
+          return { ...prevChat, messages: updatedMessages }
+        })
+      }
+
+      await streamSSE(response, (data) => {
+        accumulatedContent += data.content || ""
+        const currentTime = Date.now()
+        if (currentTime - lastUpdateTime >= UPDATE_INTERVAL) {
+          updateTempContent(accumulatedContent)
+          lastUpdateTime = currentTime
+        }
+      })
+
+      setCurrentChat(prevChat => prevChat ? { ...prevChat, messages: prevChat.messages.map((m) => m.id === tempMessage.id ? { ...m, content: accumulatedContent } : m) } : null)
 
       // Final update to persist in the database
       await addMessageToChat(targetChat.id, {
@@ -401,33 +300,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Helper function to get provider name for the current model
-  const getProviderForModel = (modelName: string): string => {
-    // If we have an activeProvider in settings and it matches the current model, use it
-    if (settings.activeModel === modelName && settings.activeProvider) {
-      const provider = settings.activeProvider.toLowerCase();
-      // Normalize Google Gemini to gemini
-      if (provider === "google gemini") return "gemini";
-      return provider;
-    }
+  /** Find provider identifier for a given model name based on settings. */
+  const getProviderForModel = (modelName: string): string => _getProviderForModel(settings, modelName)
 
-    // Otherwise, try to find provider in the settings
-    for (const provider of settings.providers) {
-      const models = provider.Models.split(",").map((m) => m.trim())
-
-      if (models.includes(modelName)) {
-        let providerName = provider.Provider.toLowerCase()
-        if (providerName === "huggingface") return "huggingface"
-        if (providerName === "openrouter") return "openrouter"
-        if (providerName === "google gemini") return "gemini"
-        if (providerName === "ollama") return "ollama"
-        if (providerName === "groq") return "groq"
-      }
-    }
-
-    // Default to ollama if no match
-    return "No Provider Found"
-  }
-
+  /** Update settings in storage and cache, then update state. */
   const updateChatSettings = async (newSettings: Settings) => {
     try {
       // Save to file
@@ -443,6 +319,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   }
 
   // Function to handle editing and resending a message
+  /**
+   * Edit a previously sent user message by truncating the conversation and resending.
+   */
   const editAndResendMessage = async (messageIdToEdit: string, newContent: string) => {
     if (!currentChat || !newContent) return;
 
@@ -484,6 +363,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Function to delete a message and its pair (user+assistant)
+  /**
+   * Delete a message and its adjacent pair (user+assistant), depending on the target role.
+   */
   const deleteMessagePair = async (messageIdToDelete: string) => {
     if (!currentChat) return;
 
@@ -561,6 +443,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>
 }
 
+/** Access the chat context; must be used within a ChatProvider. */
 export function useChat() {
   const context = useContext(ChatContext)
   if (context === undefined) {
