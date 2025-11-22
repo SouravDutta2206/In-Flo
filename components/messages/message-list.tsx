@@ -4,7 +4,7 @@ import { useRef, useEffect, useState } from "react"
 import type { ChatMessage } from "@/types/chat"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Copy, Loader2, Check, Pencil, Trash2 } from "lucide-react"
+import { Copy, Loader2, Check, Pencil, Trash2, Brain, Cpu, Gauge, Clock } from "lucide-react"
 import { format } from "date-fns"
 import { MessageContent } from "@/components/messages/content/message-content"
 import { useChat } from "@/context/chat-context"
@@ -93,11 +93,6 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
               onMouseEnter={() => setHoveredMessageId(message.id)}
               onMouseLeave={() => setHoveredMessageId(null)}
             >
-              {message.role === "assistant" && message.model && (
-                <div className="text-xs opacity-100 text-muted-foreground mb-4">
-                  {message.model} ({message.provider || 'unknown'})
-                </div>
-              )}
               {editingMessageId === message.id ? (
                 <EditMessageInput 
                   initialContent={message.content}
@@ -115,12 +110,28 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
                 <div className="flex flex-col gap-1 mt-4">
                   <div className="text-xs opacity-100 text-muted-foreground">{format(new Date(message.createdAt), "HH:mm")}</div>
                   {message.role === "assistant" && (
-                    <div className="text-xs text-muted-foreground opacity-70">
-                      {Math.ceil(message.content.length / 4)} tokens
+                    <div className="text-xs text-muted-foreground opacity-100 mt-2 flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1">
+                        <Brain className="h-3 w-3" />
+                        <span>{message.model} ({message.provider || 'unknown'})</span>
+                      </div>
+                      <span>|</span>
+                      <div className="flex items-center gap-1">
+                        <Cpu className="h-3 w-3" />
+                        <span>{Math.ceil(message.content.length / 4)} tokens</span>
+                      </div>
                       {message.duration && (
                         <>
-                          {` · ${(Math.ceil(message.content.length / 4) / (message.duration / 1000)).toFixed(1)} tokens/sec`}
-                          {` · Time-to-finish: ${(message.duration / 1000).toFixed(1)}s`}
+                          <span>.</span>
+                          <div className="flex items-center gap-1">
+                            <Gauge className="h-3 w-3" />
+                            <span>{(Math.ceil(message.content.length / 4) / (message.duration / 1000)).toFixed(1)} tokens/sec</span>
+                          </div>
+                          <span>.</span>
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            <span>{(message.duration / 1000).toFixed(1)}s Time-to-finish</span>
+                          </div>
                         </>
                       )}
                     </div>
@@ -135,6 +146,7 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
                 isHovered={hoveredMessageId === message.id}
                 isCopied={copiedMessageId === message.id}
                 onCopy={() => {
+                  if (!navigator.clipboard) return
                   navigator.clipboard.writeText(message.content)
                   setCopiedMessageId(message.id)
                   setTimeout(() => setCopiedMessageId(null), 1000)
