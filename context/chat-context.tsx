@@ -170,6 +170,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     let accumulatedContent = ""
     let model = ""
     let provider = ""
+    let sources: Record<string, { url: string; score?: number; snippet?: string }> | undefined = undefined
+    let firstChunkTime: number | null = null
     
     // If no current chat, create a new one
     if (!targetChat) {
@@ -249,37 +251,49 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       let lastUpdateTime = Date.now()
       const UPDATE_INTERVAL = 100
 
-      const updateTempContent = (content: string) => {
+      const updateTempContent = (content: string, messageSources?: Record<string, { url: string; score?: number; snippet?: string }>) => {
         setCurrentChat(prevChat => {
           if (!prevChat) return null
           const updatedMessages = prevChat.messages.map((msg: ChatMessage) =>
-            msg.id === tempMessage.id ? { ...msg, content } : msg
+            msg.id === tempMessage.id ? { ...msg, content, sources: messageSources } : msg
           )
           return { ...prevChat, messages: updatedMessages }
         })
       }
 
       await streamSSE(response, (data) => {
+        // Record time of first chunk arrival
+        if (firstChunkTime === null) {
+          firstChunkTime = Date.now()
+        }
+        
+        // Capture sources from the first chunk
+        if (data.sources && !sources) {
+          sources = data.sources
+        }
+        
         accumulatedContent += data.content || ""
         const currentTime = Date.now()
         if (currentTime - lastUpdateTime >= UPDATE_INTERVAL) {
-          updateTempContent(accumulatedContent)
+          updateTempContent(accumulatedContent, sources)
           lastUpdateTime = currentTime
         }
       })
 
-      setCurrentChat(prevChat => prevChat ? { ...prevChat, messages: prevChat.messages.map((m) => m.id === tempMessage.id ? { ...m, content: accumulatedContent } : m) } : null)
+      setCurrentChat(prevChat => prevChat ? { ...prevChat, messages: prevChat.messages.map((m) => m.id === tempMessage.id ? { ...m, content: accumulatedContent, sources } : m) } : null)
 
       // Final update to persist in the database
+      // Calculate duration from first chunk to last chunk (excludes TTFT)
       const endTime = Date.now();
-      const duration = endTime - startTime;
+      const duration = firstChunkTime ? endTime - firstChunkTime : endTime - startTime;
 
       const persistedChat = await addMessageToChat(targetChat.id, {
         role: "assistant",
         content: accumulatedContent,
         model: model,
         provider: provider,
-        duration: duration
+        duration: duration,
+        sources: sources
       });
 
       if (persistedChat) {
@@ -293,14 +307,16 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         // Save the partial response if there is any
         if (accumulatedContent && targetChat) {
           const endTime = Date.now();
-          const duration = endTime - startTime;
+          // Use first chunk time if available for consistent timing
+          const duration = firstChunkTime ? endTime - firstChunkTime : endTime - startTime;
           
           const persistedChat = await addMessageToChat(targetChat.id, {
             role: "assistant",
             content: accumulatedContent,
             model: model,
             provider: provider,
-            duration: duration
+            duration: duration,
+            sources: sources
           });
 
           if (persistedChat) {

@@ -10,14 +10,21 @@ import 'katex/dist/katex.min.css'
 import "prismjs/themes/prism-tomorrow.css"
 import "@/app/globals.css"
 import { MarkdownPre } from "@/components/messages/content/code-block"
+import { CitationLink } from "@/components/messages/content/citation-link"
+import { SourcesFooter } from "@/components/messages/content/sources-footer"
+import { useMemo } from "react"
 
 interface MessageContentProps {
   content: string
   isUser: boolean
+  sources?: Record<string, { url: string; score?: number; snippet?: string }>
 }
 
-// Normalize Markdown content while preserving code blocks and math delimiters
-function normalizeMarkdownContent(text: string): string {
+/**
+ * Normalize Markdown content while preserving code blocks and math delimiters.
+ * Converts citation markers [N] to markdown links [N](citation:N) when sources exist.
+ */
+function normalizeMarkdownContent(text: string, sources?: Record<string, any>): string {
   const codeBlocks: string[] = []
   let processedText = text.replace(/```[\s\S]*?```|`[^`]+`/g, (match) => {
     codeBlocks.push(match)
@@ -38,12 +45,18 @@ function normalizeMarkdownContent(text: string): string {
     return `___INLINE_MATH${inlineMath.length - 1}___`
   })
 
-  processedText = processedText
+  // Convert citation markers [N] to links when sources exist
+  if (sources && Object.keys(sources).length > 0) {
+    processedText = processedText.replace(/\[(\d+)\]/g, (match, id) => {
+      return sources[id] ? `[${id}](citation:${id})` : match
+    })
+  }
+
+  return processedText
     .replace(/___DISPLAY_MATH(\d+)___/g, (_m, index) => `\n\n${displayMath[parseInt(index)]}\n\n`)
     .replace(/___INLINE_MATH(\d+)___/g, (_m, index) => inlineMath[parseInt(index)])
     .replace(/___CODE(\d+)___/g, (_m, index) => codeBlocks[parseInt(index)])
-
-  return processedText.trim()
+    .trim()
 }
 
 const markdownComponents = {
@@ -77,20 +90,46 @@ const rehypePlugins: any[] = [
   }]
 ]
 
-export function MessageContent({ content, isUser }: MessageContentProps) {
+/**
+ * MessageContent renders a message with markdown, citations, math, and code blocks.
+ * Inline citations [N] show tooltips with source info and link to the source URL.
+ */
+export function MessageContent({ content, isUser, sources }: MessageContentProps) {
   if (isUser) {
     return <p className="whitespace-pre-wrap break-words">{content}</p>
   }
+
+  const components = useMemo(() => ({
+    ...markdownComponents,
+    p: ({ children }: any) => <span className="block mb-4 last:mb-0">{children}</span>,
+    a: ({ href, children, ...props }: any) => {
+      // Handle citation links with CitationLink component
+      if (href?.startsWith('citation:')) {
+        const id = href.replace('citation:', '')
+        const source = sources?.[id]
+        if (source) {
+          return <CitationLink id={id} url={source.url} snippet={source.snippet} />
+        }
+      }
+      return <a href={href} {...props}>{children}</a>
+    }
+  }), [sources])
 
   return (
     <div className="prose prose-invert max-w-none">
       <ReactMarkdown
         remarkPlugins={remarkPlugins as any}
         rehypePlugins={rehypePlugins}
-        components={markdownComponents as any}
+        components={components as any}
+        urlTransform={(url) => url}
       >
-        {normalizeMarkdownContent(content)}
+        {normalizeMarkdownContent(content, sources)}
       </ReactMarkdown>
+      
+      {/* Collapsible sources footer */}
+      {sources && Object.keys(sources).length > 0 && (
+        <SourcesFooter sources={sources} />
+      )}
     </div>
   )
 }

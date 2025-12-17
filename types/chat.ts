@@ -7,6 +7,7 @@ export interface ChatMessage {
   model?: string
   provider?: string
   duration?: number
+  sources?: Record<string, { url: string; score?: number; snippet?: string }>
 }
 
 /** A persisted chat thread containing messages and metadata. */
