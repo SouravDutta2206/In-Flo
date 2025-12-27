@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useEffect, useState } from "react"
+import { useRef, useEffect, useState, useCallback } from "react"
 import type { ChatMessage } from "@/types/chat"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -25,46 +25,89 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
   const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null)
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null)
-  const scrollLockRef = useRef(false)
+  const userHasScrolledUp = useRef(false)
+  const lastScrollTop = useRef(0)
+  const scrollContainerRef = useRef<HTMLElement | null>(null)
 
-  const scrollToBottom = () => {
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }, 100)
-  }
+  // Find the scrollable parent container
+  const getScrollContainer = useCallback(() => {
+    if (scrollContainerRef.current) return scrollContainerRef.current
+    // Find the parent with overflow-y-auto (the main content container)
+    let element = messagesEndRef.current?.parentElement
+    while (element) {
+      const style = window.getComputedStyle(element)
+      if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
+        scrollContainerRef.current = element
+        return element
+      }
+      element = element.parentElement
+    }
+    return null
+  }, [])
+
+  const isNearBottom = useCallback(() => {
+    const container = getScrollContainer()
+    if (!container) return true
+    const threshold = 150
+    return container.scrollHeight - container.scrollTop - container.clientHeight < threshold
+  }, [getScrollContainer])
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+  }, [])
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Initial scroll
+  // Attach scroll listener to the actual scrollable parent
+  useEffect(() => {
+    const container = getScrollContainer()
+    if (!container) return
+
+    const handleScroll = () => {
+      const currentScrollTop = container.scrollTop
+
+      // User is scrolling up
+      if (currentScrollTop < lastScrollTop.current - 10) {
+        if (!isNearBottom()) {
+          userHasScrolledUp.current = true
+        }
+      }
+
+      // User scrolled back to bottom
+      if (isNearBottom()) {
+        userHasScrolledUp.current = false
+      }
+
+      lastScrollTop.current = currentScrollTop
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [mounted, getScrollContainer, isNearBottom])
+
+  // Initial scroll when chat loads
   useEffect(() => {
     if (mounted && messages.length > 0) {
+      userHasScrolledUp.current = false
       scrollToBottom()
     }
-  }, [mounted, messages.length])
+  }, [mounted]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Scroll on updates unless user scrolled up
+  // Auto-scroll on content updates ONLY if user hasn't scrolled up
   useEffect(() => {
-    if (!scrollLockRef.current && messagesEndRef.current) {
+    if (!userHasScrolledUp.current) {
       scrollToBottom()
     }
-  }, [messages, isLoading])
+  }, [messages, isLoading, scrollToBottom])
 
-  // Handle scroll events to determine if user has scrolled up
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const container = e.currentTarget
-    const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 100
-    scrollLockRef.current = !isAtBottom
-  }
-
-  // Return a simple div with the same structure while not mounted
   if (!mounted) {
     return <div className="flex-1" />
   }
 
   return (
-    <div className="flex-1 p-4 space-y-6 pb-40 pr-0" onScroll={handleScroll}>
+    <div className="flex-1 p-4 space-y-6 pb-40 pr-0">
       {messages.length === 0 ? (
         <div className="flex h-full items-center justify-center">
           <div className="text-center space-y-2">
@@ -74,18 +117,18 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
         </div>
       ) : (
         messages.map((message) => (
-          <div 
-            key={message.id} 
+          <div
+            key={message.id}
             className={cn(
               "flex flex-col",
-              message.role === "user" ? "items-end" : "items-start" 
+              message.role === "user" ? "items-end" : "items-start"
             )}
           >
             <div
               className={cn(
                 "max-w-[100%] bg-muted text-white rounded-xl px-4 py-2 break-words",
-                message.role === "user" 
-                  ? editingMessageId === message.id 
+                message.role === "user"
+                  ? editingMessageId === message.id
                     ? "w-full"
                     : "max-w-[60%]"
                   : "w-full bg-transparent"
@@ -94,7 +137,7 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
               onMouseLeave={() => setHoveredMessageId(null)}
             >
               {editingMessageId === message.id ? (
-                <EditMessageInput 
+                <EditMessageInput
                   initialContent={message.content}
                   messageId={message.id}
                   onSave={(id: string, newContent: string) => {
@@ -104,39 +147,54 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
                   onCancel={() => setEditingMessageId(null)}
                 />
               ) : (
-                <MessageContent 
-                  content={message.content} 
-                  isUser={message.role === "user"} 
+                <MessageContent
+                  content={message.content}
+                  isUser={message.role === "user"}
                   thinking={message.thinking}
                   thinkingDuration={message.thinkingDuration}
-                  sources={message.sources} 
+                  sources={message.sources}
                 />
               )}
               {editingMessageId !== message.id && (
                 <div className="flex flex-col gap-1 mt-4">
-                  <div className="text-xs opacity-100 text-muted-foreground">{format(new Date(message.createdAt), "HH:mm")}</div>
+                  <div className="text-xs opacity-100 text-muted-foreground">
+                    {format(new Date(message.createdAt), "HH:mm")}
+                  </div>
                   {message.role === "assistant" && (
                     <div className="text-xs text-muted-foreground opacity-100 mt-2 flex items-center gap-2 flex-wrap">
                       <div className="flex items-center gap-1">
                         <Brain className="h-3 w-3" />
-                        <span>{message.model} ({message.provider || 'unknown'})</span>
+                        <span>
+                          {message.model} ({message.provider || "unknown"})
+                        </span>
                       </div>
                       <span>|</span>
                       <div className="flex items-center gap-1">
                         <Cpu className="h-3 w-3" />
-                        <span>{Math.ceil(message.content.length / 4)} tokens</span>
+                        <span>
+                          {Math.ceil(message.content.length / 4)} tokens
+                        </span>
                       </div>
                       {message.duration && (
                         <>
                           <span>.</span>
                           <div className="flex items-center gap-1">
                             <Gauge className="h-3 w-3" />
-                            <span>{(Math.ceil(message.content.length / 4) / (message.duration / 1000)).toFixed(1)} tokens/sec</span>
+                            <span>
+                              {(
+                                Math.ceil(message.content.length / 4) /
+                                (message.duration / 1000)
+                              ).toFixed(1)}{" "}
+                              tokens/sec
+                            </span>
                           </div>
                           <span>.</span>
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
-                            <span>{(message.duration / 1000).toFixed(1)}s Time-to-finish</span>
+                            <span>
+                              {(message.duration / 1000).toFixed(1)}s
+                              Time-to-finish
+                            </span>
                           </div>
                         </>
                       )}
@@ -145,8 +203,8 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
                 </div>
               )}
             </div>
-            
-            <div className={cn("flex items-center mt-1 space-x-1")}> 
+
+            <div className={cn("flex items-center mt-1 space-x-1")}>
               <MessageActions
                 role={message.role}
                 isHovered={hoveredMessageId === message.id}
@@ -205,7 +263,11 @@ function MessageActions({
         )}
         onClick={onCopy}
       >
-        {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+        {isCopied ? (
+          <Check className="h-4 w-4" />
+        ) : (
+          <Copy className="h-4 w-4" />
+        )}
       </Button>
 
       {role === "user" && (
@@ -237,5 +299,3 @@ function MessageActions({
     </>
   )
 }
-
-
