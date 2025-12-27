@@ -6,7 +6,7 @@ Search for URLs, scrape content, return LangChain Documents.
 import asyncio
 from langchain_core.documents import Document
 from ddgs import DDGS
-from utils.web_search_new.scraper import scrape_urls_async
+from utils.web_search.scraper import scrape_urls_async
 from tavily import TavilyClient
 
 

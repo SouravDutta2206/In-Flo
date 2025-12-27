@@ -3,10 +3,12 @@ export interface ChatMessage {
   id: string
   role: "user" | "assistant" | "system"
   content: string
+  thinking?: string
   createdAt: string
   model?: string
   provider?: string
   duration?: number
+  thinkingDuration?: number
   sources?: Record<string, { url: string; score?: number; snippet?: string }>
 }
 

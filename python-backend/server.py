@@ -11,19 +11,9 @@ import time
 from utils.prompts import base_prompt, prompt_with_context
 from utils.model_list import get_gemini_models_list, get_groq_models_list
 from utils.schemas import ModelResponse, ModelRequest, ModelID, ChatRequest, Message, RequestState
-from utils.query_func import chat_ollama, chat_huggingface, chat_openrouter, chat_groq, chat_gemini
+from utils.query_func import chat_stream
 from utils.web_search.search import search_and_scrape as search
 from utils.faiss import chunk_docs, faiss_search
-
-
-# Provider dispatch map
-CHAT_HANDLERS = {
-    "ollama": chat_ollama,
-    "huggingface": chat_huggingface,
-    "openrouter": chat_openrouter,
-    "groq": chat_groq,
-    "gemini": chat_gemini,
-}
 
 
 app = FastAPI(
@@ -157,13 +147,11 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
 
     # Create request state and dispatch to provider
     state = RequestState(request_id, app)
-    provider = request.model.provider.lower()
     
-    handler = CHAT_HANDLERS.get(provider)
-    if not handler:
-        raise HTTPException(status_code=400, detail=f"Unsupported provider: {provider}")
-    
-    return await handler(request, state, source_map)
+    try:
+        return await chat_stream(request, state, source_map)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 if __name__ == "__main__":

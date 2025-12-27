@@ -102,20 +102,20 @@ export function SourceCard({ id, source }: SourceCardProps) {
       )}
     >
       {/* Top row: [n] favicon domain | external link */}
-      <div className="flex items-center justify-between h-10">
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm text-muted-foreground font-medium">[{id}]</span>
+      <div className="flex items-center justify-between gap-2 h-10">
+        <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+          <span className="text-sm text-muted-foreground font-medium flex-shrink-0">[{id}]</span>
           <img 
             src={getFaviconUrl(source.url)} 
             alt="" 
-            className="h-4 w-4 rounded-sm"
+            className="h-4 w-4 rounded-sm flex-shrink-0"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = 'none'
             }}
           />
-          <span className="text-sm text-muted-foreground font-medium capitalize">{domain}</span>
+          <span className="text-sm text-muted-foreground font-medium capitalize truncate">{domain}</span>
         </div>
-        <ExternalLink className="h-3 w-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+        <ExternalLink className="h-3 w-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors flex-shrink-0" />
       </div>
 
       {/* Snippet */}

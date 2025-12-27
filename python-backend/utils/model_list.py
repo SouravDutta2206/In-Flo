@@ -93,8 +93,4 @@ def get_groq_models_list(api_key):
 
         return model_list
 
-if __name__ == "__main__":
-    api_key = "AIzaSyAMfR2iPgGgF6oGIM-iDlHTCz8t3nGTWUg"
-    print(get_gemini_models_list(api_key))
-
 

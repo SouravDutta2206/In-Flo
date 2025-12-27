@@ -12,11 +12,15 @@ import "@/app/globals.css"
 import { MarkdownPre } from "@/components/messages/content/code-block"
 import { CitationLink } from "@/components/messages/content/citation-link"
 import { SourcesFooter } from "@/components/messages/content/sources-footer"
-import { useMemo } from "react"
+import { ThinkingBlock } from "@/components/messages/content/thinking-block"
+import React, { useMemo } from "react"
 
 interface MessageContentProps {
   content: string
   isUser: boolean
+  thinking?: string
+  isStreaming?: boolean
+  thinkingDuration?: number
   sources?: Record<string, { url: string; score?: number; snippet?: string }>
 }
 
@@ -24,7 +28,7 @@ interface MessageContentProps {
  * Normalize Markdown content while preserving code blocks and math delimiters.
  * Converts citation markers [N] to markdown links [N](citation:N) when sources exist.
  */
-function normalizeMarkdownContent(text: string, sources?: Record<string, any>): string {
+function normalizeMarkdownContent(text: string, sources?: MessageContentProps['sources']): string {
   const codeBlocks: string[] = []
   let processedText = text.replace(/```[\s\S]*?```|`[^`]+`/g, (match) => {
     codeBlocks.push(match)
@@ -59,9 +63,14 @@ function normalizeMarkdownContent(text: string, sources?: Record<string, any>): 
     .trim()
 }
 
+interface CodeProps extends React.HTMLAttributes<HTMLElement> {
+  className?: string
+  children?: React.ReactNode
+}
+
 const markdownComponents = {
   pre: MarkdownPre,
-  code: ({ className, children, ...props }: any) => {
+  code: ({ className, children, ...props }: CodeProps) => {
     const match = /language-(\w+)/.exec(className || '')
     const isInline = !match
     if (isInline) {
@@ -94,15 +103,15 @@ const rehypePlugins: any[] = [
  * MessageContent renders a message with markdown, citations, math, and code blocks.
  * Inline citations [N] show tooltips with source info and link to the source URL.
  */
-export function MessageContent({ content, isUser, sources }: MessageContentProps) {
+export function MessageContent({ content, isUser, thinking, isStreaming, thinkingDuration, sources }: MessageContentProps) {
   if (isUser) {
     return <p className="whitespace-pre-wrap break-words">{content}</p>
   }
 
   const components = useMemo(() => ({
     ...markdownComponents,
-    p: ({ children }: any) => <span className="block mb-4 last:mb-0">{children}</span>,
-    a: ({ href, children, ...props }: any) => {
+    p: ({ children }: { children?: React.ReactNode }) => <span className="block mb-4 last:mb-0">{children}</span>,
+    a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
       // Handle citation links with CitationLink component
       if (href?.startsWith('citation:')) {
         const id = href.replace('citation:', '')
@@ -117,6 +126,11 @@ export function MessageContent({ content, isUser, sources }: MessageContentProps
 
   return (
     <div className="prose prose-invert max-w-none">
+      {/* Collapsible thinking block for chain-of-thought models */}
+      {thinking && (
+        <ThinkingBlock thinking={thinking} isStreaming={isStreaming && !content} thinkingDuration={thinkingDuration} />
+      )}
+      
       <ReactMarkdown
         remarkPlugins={remarkPlugins as any}
         rehypePlugins={rehypePlugins}

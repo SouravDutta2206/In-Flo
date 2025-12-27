@@ -104,7 +104,13 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
                   onCancel={() => setEditingMessageId(null)}
                 />
               ) : (
-                <MessageContent content={message.content} isUser={message.role === "user"} sources={message.sources} />
+                <MessageContent 
+                  content={message.content} 
+                  isUser={message.role === "user"} 
+                  thinking={message.thinking}
+                  thinkingDuration={message.thinkingDuration}
+                  sources={message.sources} 
+                />
               )}
               {editingMessageId !== message.id && (
                 <div className="flex flex-col gap-1 mt-4">

@@ -22,19 +22,21 @@ def prompt_with_context(context: str, query: str, source_map: dict[int, dict[str
                         4. Formulate a detailed answer that directly addresses the question, using only the information provided in the context.
                         5. Ensure your answer is comprehensive, covering all relevant aspects found in the context.
                         6. If the context doesn't contain sufficient information to fully answer the question, state this clearly in your response.
+                        7. It doesn't matter if you are thinking or giving the final response, the citaions should be there in the final response too.
+                        8. If there is conflicting information use what majority of the sources say.
                         
+                        Format your response with context as follows and adhere to these guidelines strictly:
+                        1. Whenever you make a claim based on a specific chunk, you must cite it immediately at the end of the sentence using the format [id].
+                        2. Example: 'The sky is blue [1], and grass is green [2].'
+                        3. Do not group citations like [1, 2]; instead use [1][2].
+                        4. If the answer is not in the context, state that you do not know.
+
                         Format your response as follows:
                         1. Use clear, concise language.
                         2. Organize your answer into paragraphs for readability.
                         3. Use bullet points or numbered lists where appropriate to break down complex information.
                         4. If relevant, include any headings or subheadings to structure your response.
                         5. Ensure proper grammar, punctuation, and spelling throughout your answer.
-
-                        Format your response with context as follows and adhere to these guidelines strictly:
-                        1. Whenever you make a claim based on a specific chunk, you must cite it immediately at the end of the sentence using the format [id].
-                        2. Example: 'The sky is blue [1], and grass is green [2].'
-                        3. Do not group citations like [1, 2]; instead use [1][2].
-                        4. If the answer is not in the context, state that you do not know.
                         
                         Important: Base your entire response solely on the information provided in the context. Do not include any external knowledge or assumptions not present in the given text.''')
         }
