@@ -138,7 +138,7 @@ export function useChatStreaming(deps: StreamingDeps) {
       setCurrentChat({ ...updatedChat, messages: [...updatedChat.messages, tempMessage] })
 
       let lastUpdateTime = Date.now()
-      const UPDATE_INTERVAL = 100
+      const UPDATE_INTERVAL = 50 // Lower interval for smoother streaming
 
       const updateTempContent = (
         content: string,

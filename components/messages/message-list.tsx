@@ -52,9 +52,12 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
     return container.scrollHeight - container.scrollTop - container.clientHeight < threshold
   }, [getScrollContainer])
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
-  }, [])
+  // Simple snap scroll - no animation during streaming to prevent bouncing
+  const scrollToBottomInstant = useCallback(() => {
+    const container = getScrollContainer()
+    if (!container) return
+    container.scrollTop = container.scrollHeight - container.clientHeight
+  }, [getScrollContainer])
 
   useEffect(() => {
     setMounted(true)
@@ -87,20 +90,26 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
     return () => container.removeEventListener('scroll', handleScroll)
   }, [mounted, getScrollContainer, isNearBottom])
 
-  // Initial scroll when chat loads
+  // Initial scroll when chat loads - use smooth scroll
   useEffect(() => {
     if (mounted && messages.length > 0) {
       userHasScrolledUp.current = false
-      scrollToBottom()
+      // Use requestAnimationFrame to ensure DOM is updated first
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      })
     }
   }, [mounted]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-scroll on content updates ONLY if user hasn't scrolled up
+  // Auto-scroll on content updates - use instant scroll to prevent bouncing
   useEffect(() => {
     if (!userHasScrolledUp.current) {
-      scrollToBottom()
+      // Use requestAnimationFrame to batch with rendering
+      requestAnimationFrame(() => {
+        scrollToBottomInstant()
+      })
     }
-  }, [messages, isLoading, scrollToBottom])
+  }, [messages, isLoading, scrollToBottomInstant])
 
   if (!mounted) {
     return <div className="flex-1" />
