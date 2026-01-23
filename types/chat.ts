@@ -35,3 +35,10 @@ export interface Settings {
   activeModel?: string
   activeProvider?: string
 }
+
+/** Uploaded file with extracted text content. */
+export interface FileContext {
+  name: string
+  content: string
+  tokens: number
+}

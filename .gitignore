@@ -30,3 +30,6 @@ app_config.json*
 *.tsbuildinfo
 next-env.d.ts
 app.bat
+python-backend/utils/__pycache__/schemas.cpython-311.pyc
+python-backend/__pycache__/server.cpython-311.pyc
+python-backend/__pycache__/server.cpython-311.pyc

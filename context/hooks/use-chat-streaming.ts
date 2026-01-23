@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef } from "react"
-import type { Chat, ChatMessage, Settings } from "@/types/chat"
+import type { Chat, ChatMessage, Settings, FileContext } from "@/types/chat"
 import { addMessageToChat, deleteChat, updateChat } from "@/app/actions/chat-actions"
 import { v4 as uuidv4 } from "uuid"
 import { streamSSE } from "@/lib/stream"
@@ -41,8 +41,10 @@ export function useChatStreaming(deps: StreamingDeps) {
 
   /**
    * Send a user message, then stream assistant tokens via SSE and persist the final message.
+   * @param content - The message text
+   * @param files - Optional array of uploaded file contexts to include as document context
    */
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, files?: FileContext[]) => {
     const {
       currentChat,
       setCurrentChat,
@@ -117,6 +119,7 @@ export function useChatStreaming(deps: StreamingDeps) {
           model: { name: model, provider, key },
           web_search: isSearchMode,
           tavily_api_key: getTavilyKey(),
+          files: files || null,
         }),
         signal: controller.signal,
       })

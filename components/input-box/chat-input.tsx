@@ -3,9 +3,11 @@
 import { useState, type FormEvent, type KeyboardEvent, type ChangeEvent } from "react"
 import { Button } from "@/components/ui/button"
 import { ModelSelector } from "@/components/input-box/model-selector/model-selector"
+import { FileManager } from "@/components/input-box/file-manager"
 import { useChat } from "@/context/chat-context"
 import { Textarea } from "@/components/ui/textarea"
 import { ArrowUp, Square, SearchIcon } from "lucide-react"
+import type { FileContext } from "@/types/chat"
 
 interface ChatInputProps {
   input: string
@@ -21,6 +23,8 @@ export function ChatInput({ input, setInput, isSubmitting, setIsSubmitting }: Ch
   const { sendMessage, currentChat, stopInference, isGenerating, isSearchMode, setIsSearchMode } = useChat()
   const [historyIndex, setHistoryIndex] = useState<number>(-1)
   const [originalInput, setOriginalInput] = useState<string | null>(null)
+  const [files, setFiles] = useState<FileContext[]>([])
+  const [isUploading, setIsUploading] = useState(false)
 
   const userMessages = currentChat?.messages.filter(m => m.role === 'user').reverse() ?? [];
 
@@ -40,7 +44,7 @@ export function ChatInput({ input, setInput, isSubmitting, setIsSubmitting }: Ch
     setOriginalInput(null)
 
     try {
-      await sendMessage(trimmed)
+      await sendMessage(trimmed, files)
     } catch (error) {
       console.error("Error sending message:", error)
     } finally {
@@ -94,7 +98,7 @@ export function ChatInput({ input, setInput, isSubmitting, setIsSubmitting }: Ch
       <div className="w-full max-w-5xl mx-auto px-4">
         <form onSubmit={handleSubmit} className="flex flex-col">
           <div className="flex flex-col bg-background border border-border rounded-xl shadow-lg p-2 relative">
-            <div className="flex flex-col space-y-2">
+          <div className="flex flex-col space-y-2">
               <Textarea
                 value={input}
                 onChange={handleInputChange}
@@ -104,28 +108,27 @@ export function ChatInput({ input, setInput, isSubmitting, setIsSubmitting }: Ch
                 disabled={isSubmitting}
               />
               <div className="flex items-center justify-between">
-                <div className="flex items-center justify-between max-w-[25%] gap-1">
-                  <div className="w-full">
-                    <ModelSelector />
-                  </div>
-                  <div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setIsSearchMode(!isSearchMode)}
-                      className={`w-full justify-between px-2 py-1.5 ml-2 mb-1 text-sm rounded-md transition-colors ${
-                        isSearchMode 
-                          ? 'text-muted bg-white hover:bg-white hover:text-muted' 
-                          : 'text-gray-200 bg-transparent hover:bg-muted/80'
-                      }`}
-                    >
-                      <span className="flex items-center">
-                        <SearchIcon className="mr-2 h-4 w-4" />
-                        Web Search
-                      </span>
-                    </Button>
-                  </div>
+                <div className="flex items-center gap-1">
+                  <FileManager 
+                    files={files} 
+                    setFiles={setFiles}
+                    isUploading={isUploading}
+                    setIsUploading={setIsUploading}
+                  />
+                  <ModelSelector />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setIsSearchMode(!isSearchMode)}
+                    className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors ${
+                      isSearchMode 
+                        ? 'text-muted bg-white hover:bg-white hover:text-muted' 
+                        : 'text-gray-200 bg-transparent hover:bg-muted/80'
+                    }`}
+                  >
+                    <SearchIcon className="h-4 w-4" />
+                    Web Search
+                  </Button>
                 </div>
                 <div>
                       {isGenerating ? (

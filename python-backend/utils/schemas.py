@@ -3,7 +3,7 @@ sys.dont_write_bytecode = True
 
 from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 
 class ModelInfo(BaseModel):
@@ -14,12 +14,19 @@ class ModelInfo(BaseModel):
 class Message(BaseModel):
     role: str   
     content: str
+
+class FileContext(BaseModel):
+    """Represents an uploaded file with extracted text content."""
+    name: str
+    content: str
+    tokens: int
     
 class ChatRequest(BaseModel):
     conversation: List[Message]
     model: ModelInfo
     web_search: bool = False
     tavily_api_key: str = ""
+    files: Optional[List[FileContext]] = None
 
 class SourcePath(BaseModel):
     path: str

@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect } from "react"
-import type { Chat, ChatMessage, Settings } from "@/types/chat"
+import type { Chat, ChatMessage, Settings, FileContext } from "@/types/chat"
 import { useChatSettings } from "@/context/hooks/use-chat-settings"
 import { useChatStorage } from "@/context/hooks/use-chat-storage"
 import { useChatStreaming } from "@/context/hooks/use-chat-streaming"
@@ -16,7 +16,7 @@ interface ChatContextType {
   selectChat: (id: string) => Promise<Chat | null>
   createNewChat: () => Promise<Chat>
   deleteCurrentChat: () => Promise<void>
-  sendMessage: (content: string) => Promise<void>
+  sendMessage: (content: string, files?: FileContext[]) => Promise<void>
   updateChatSettings: (settings: Settings) => Promise<void>
   deleteChatById: (id: string) => Promise<void>
   editAndResendMessage: (messageIdToEdit: string, newContent: string) => Promise<void>

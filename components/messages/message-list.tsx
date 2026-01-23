@@ -9,6 +9,7 @@ import { format } from "date-fns"
 import { MessageContent } from "@/components/messages/content/message-content"
 import { useChat } from "@/context/chat-context"
 import { EditMessageInput } from "@/components/input-box/edit-message-input"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface MessageListProps {
   messages: ChatMessage[]
@@ -261,50 +262,79 @@ function MessageActions({
   onDelete: () => void
 }) {
   return (
-    <>
-      <Button
-        variant="ghost"
-        size="icon"
-        className={cn(
-          "z-50 h-10 w-10 rounded-xl opacity-0 hover:opacity-100 hover:bg-muted transition-opacity duration-200",
-          isHovered || isCopied ? "opacity-100" : "opacity-0",
-          role === "assistant" ? "ml-3" : ""
-        )}
-        onClick={onCopy}
-      >
-        {isCopied ? (
-          <Check className="h-4 w-4" />
-        ) : (
-          <Copy className="h-4 w-4" />
-        )}
-      </Button>
+    <TooltipProvider delayDuration={400}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "z-50 h-10 w-10 rounded-xl opacity-0 hover:opacity-100 hover:bg-muted transition-opacity duration-200",
+              isHovered || isCopied ? "opacity-100" : "opacity-0",
+              role === "assistant" ? "ml-3" : ""
+            )}
+            onClick={onCopy}
+          >
+            {isCopied ? (
+              <Check className="h-4 w-4" />
+            ) : (
+              <Copy className="h-4 w-4" />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent 
+          side="top" 
+          className="bg-muted text-muted-foreground rounded-xl shadow-lg border border-gray-700 px-3 py-1.5"
+        >
+          <p>Copy Message</p>
+        </TooltipContent>
+      </Tooltip>
 
       {role === "user" && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(
-            "z-50 h-10 w-10 rounded-xl opacity-0 hover:opacity-100 hover:bg-muted transition-opacity duration-200",
-            isHovered ? "opacity-100" : "opacity-0"
-          )}
-          onClick={onEdit}
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "z-50 h-10 w-10 rounded-xl opacity-0 hover:opacity-100 hover:bg-muted transition-opacity duration-200",
+                isHovered ? "opacity-100" : "opacity-0"
+              )}
+              onClick={onEdit}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent 
+            side="top" 
+            className="bg-muted text-muted-foreground rounded-xl shadow-lg border border-gray-700 px-3 py-1.5"
+          >
+            <p>Edit Message</p>
+          </TooltipContent>
+        </Tooltip>
       )}
 
-      <Button
-        variant="ghost"
-        size="icon"
-        className={cn(
-          "z-50 h-10 w-10 rounded-xl opacity-0 hover:opacity-100 hover:bg-muted transition-opacity duration-200",
-          isHovered ? "opacity-100" : "opacity-0"
-        )}
-        onClick={onDelete}
-        title="Delete Message Pair"
-      >
-        <Trash2 className="h-4 w-4" />
-      </Button>
-    </>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "z-50 h-10 w-10 rounded-xl opacity-0 hover:opacity-100 hover:bg-muted transition-opacity duration-200",
+              isHovered ? "opacity-100" : "opacity-0"
+            )}
+            onClick={onDelete}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent 
+          side="top" 
+          className="bg-muted text-muted-foreground rounded-xl shadow-lg border border-gray-700 px-3 py-1.5"
+        >
+          <p>Delete Message Pair</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }

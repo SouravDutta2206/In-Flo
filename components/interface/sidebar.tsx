@@ -51,7 +51,7 @@ export function Sidebar({ onClose }: SidebarProps) {
   return (
     <div className="flex flex-col h-full p-4">
       <div className={cn("flex flex-row items-center justify-center mt-1 mb-6", isMobile && "justify-between")}>
-        <h1 className={cn("text-xl font-bold justify-center", isMobile && "ml-10 pl-7")}>ChatLLM</h1>
+        <h1 className={cn("text-xl font-bold justify-center", isMobile && "ml-10 pl-7")}>In-Flo</h1>
         {isMobile && (
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5 " />

@@ -2,7 +2,7 @@ import os
 import sys
 sys.dont_write_bytecode = True
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from typing import List, Optional
@@ -14,6 +14,7 @@ from utils.schemas import ModelResponse, ModelRequest, ModelID, ChatRequest, Mes
 from utils.query_func import chat_stream
 from utils.web_search.search import search_and_scrape as search
 from utils.faiss import chunk_docs, faiss_search
+from utils.pdf_processing import process_pdf, build_file_context
 
 
 app = FastAPI(
@@ -64,7 +65,6 @@ async def process_web_search(
         Tuple of (context_string, source_map) or ("", None) if no results
     """
     start_time = time.time()
-    #results = await web_search(user_query=query, tavily_api_key=tavily_api_key)
     results = await search(query=query, tavily_api_key=tavily_api_key)
     if not results:
         return "", None
@@ -74,6 +74,7 @@ async def process_web_search(
     end_time = time.time()
     print(f"[WEB SEARCH] took {end_time - start_time:.2f}s")
     return search_results
+
 
 def build_prompt(query: str, context: str, source_map: Optional[dict]) -> Message:
     """Build the formatted prompt message with or without context."""
@@ -86,6 +87,26 @@ def build_prompt(query: str, context: str, source_map: Optional[dict]) -> Messag
 
 
 # API Endpoints
+
+@app.post("/api/files/process")
+async def process_file_endpoint(file: UploadFile = File(...)):
+    """
+    Process an uploaded PDF file and extract its text content as markdown.
+    
+    Returns:
+        FileContext with name, markdown content, and token count
+    """
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    
+    try:
+        content = await file.read()
+        return process_pdf(file.filename, content)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
+
 
 @app.post("/api/gemini/models")
 async def get_gemini_models(request: ModelRequest):
@@ -128,18 +149,32 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
     print(f"Provider: {request.model.provider}")
     print(f"Model: {request.model.name}")
     print(f"Web Search: {request.web_search}")
+    print(f"Files: {str(request.files)[:100]}...")
 
     # Extract history and current message
     history = request.conversation[:-1]
     current_message = request.conversation[-1]
     
     # Process web search if enabled
-    context, source_map = "", None
+    web_context, source_map = "", None
     if request.web_search:
-        context, source_map = await process_web_search(
+        web_context, source_map = await process_web_search(
             current_message.content, 
             request.tavily_api_key
         )
+
+    # Build file context if files provided
+    files_context = ""
+    if request.files:
+        files_context = build_file_context(request.files)
+
+    # Combine contexts (only include non-empty parts)
+    context_parts = []
+    if web_context:
+        context_parts.append(f"Web Search Results:\n{web_context}")
+    if files_context:
+        context_parts.append(f"Uploaded Documents:\n{files_context}")
+    context = "\n\n".join(context_parts)
 
     # Build final prompt
     formatted_message = build_prompt(current_message.content, context, source_map)
