@@ -62,7 +62,7 @@ export function FileManager({ files, setFiles, isUploading, setIsUploading }: Fi
         const formData = new FormData()
         formData.append('file', file)
 
-        const response = await fetch('http://localhost:8000/api/files/process', {
+        const response = await fetch('/api/files/process', {
           method: 'POST',
           body: formData,
         })
@@ -99,7 +99,15 @@ export function FileManager({ files, setFiles, isUploading, setIsUploading }: Fi
     }
   }
 
-  const clearAllFiles = () => {
+  const clearAllFiles = async () => {
+    try {
+      // Call backend to clear the entire database
+      await fetch('/api/files/clear', {
+        method: 'DELETE',
+      })
+    } catch (error) {
+      console.error('Error clearing files database:', error)
+    }
     setFiles([])
     setIsOpen(false)
   }
@@ -109,7 +117,7 @@ export function FileManager({ files, setFiles, isUploading, setIsUploading }: Fi
   }
 
   // Calculate total tokens
-  const totalTokens = files.reduce((sum, f) => sum + f.tokens, 0)
+  const totalTokens = files.reduce((sum, f) => sum + (f.tokens ?? 0), 0)
   const formatTokens = (tokens: number) => {
     if (tokens >= 1000) {
       return `${(tokens / 1000).toFixed(1)}k`
@@ -292,7 +300,7 @@ function FileRow({ file, onRemove }: FileRowProps) {
             {displayName}
           </div>
           <div className="text-xs text-gray-400">
-            {formatTokens(file.tokens)} tokens
+            {file.tokens ? `${formatTokens(file.tokens)} tokens` : `${file.chunks ?? 0} chunks`}
           </div>
         </div>
       </div>

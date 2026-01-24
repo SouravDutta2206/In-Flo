@@ -73,6 +73,64 @@ def extract_pdf_text(file_content: bytes) -> str:
     return "\n\n---\n\n".join(markdown_parts)
 
 
+def extract_pages_with_chunks(
+    filename: str,
+    file_content: bytes,
+    chunk_size: int = 800,
+    chunk_overlap: int = 80
+) -> tuple[List[str], List[dict], int]:
+    """
+    Extract PDF text as chunks with page metadata for vector storage.
+    
+    Args:
+        filename: Name of the PDF file
+        file_content: Raw bytes of the PDF file
+        chunk_size: Target size for each chunk
+        chunk_overlap: Overlap between chunks
+        
+    Returns:
+        Tuple of (chunks, metadatas, total_tokens)
+        - chunks: List of text chunks
+        - metadatas: List of {"filename": str, "page": int} dicts
+        - total_tokens: Estimated total token count
+    """
+    from langchain_classic.text_splitter import RecursiveCharacterTextSplitter
+    
+    pdf_file = io.BytesIO(file_content)
+    reader = PdfReader(pdf_file)
+    
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        length_function=len,
+        separators=["\n\n", "\n", ".", "?", "!", " ", ""]
+    )
+    
+    all_chunks = []
+    all_metadatas = []
+    total_chars = 0
+    
+    for page_num, page in enumerate(reader.pages, start=1):
+        page_text = page.extract_text()
+        if page_text:
+            cleaned_text = clean_pdf_text(page_text)
+            if cleaned_text.strip():
+                total_chars += len(cleaned_text)
+                # Split this page's text into chunks
+                page_chunks = splitter.split_text(cleaned_text)
+                for chunk in page_chunks:
+                    all_chunks.append(chunk)
+                    all_metadatas.append({
+                        "filename": filename,
+                        "page": page_num
+                    })
+    
+    # Estimate tokens (~4 chars per token)
+    total_tokens = total_chars // 4
+    
+    return all_chunks, all_metadatas, total_tokens
+
+
 def build_file_context(files: Optional[List]) -> str:
     """Build context string from uploaded files."""
     if not files:

@@ -36,9 +36,11 @@ export interface Settings {
   activeProvider?: string
 }
 
-/** Uploaded file with extracted text content. */
+/** Uploaded file reference for chat context (RAG mode). */
 export interface FileContext {
   name: string
-  content: string
-  tokens: number
+  content?: string  // Optional - not stored in RAG mode
+  tokens?: number
+  chunks?: number   // Number of chunks stored in vector DB
+  status?: string   // 'uploaded' when successfully processed
 }

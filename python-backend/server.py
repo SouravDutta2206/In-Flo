@@ -10,11 +10,13 @@ import time
 
 from utils.prompts import base_prompt, prompt_with_context
 from utils.model_list import get_gemini_models_list, get_groq_models_list
-from utils.schemas import ModelResponse, ModelRequest, ModelID, ChatRequest, Message, RequestState
+from utils.schemas import ModelResponse, ModelRequest, ModelID, ChatRequest, Message, RequestState, FileUploadResponse
 from utils.query_func import chat_stream
 from utils.web_search.search import search_and_scrape as search
 from utils.faiss import chunk_docs, faiss_search
-from utils.pdf_processing import process_pdf, build_file_context
+from utils.pdf_processing import extract_pages_with_chunks
+from utils.vector_store import add_documents, query_documents, delete_documents, clear_database, get_all_filenames
+from utils.sources import process_search_results
 
 
 app = FastAPI(
@@ -31,10 +33,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+clear_database()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage app lifecycle - initialize and cleanup request tracking."""
+    # Clear file upload database at startup for fresh state
+    print("[STARTUP] File upload database cleared")
+    
     app.state.active_requests = set()
     print("Server started, request tracking initialized")
     yield
@@ -91,21 +97,58 @@ def build_prompt(query: str, context: str, source_map: Optional[dict]) -> Messag
 @app.post("/api/files/process")
 async def process_file_endpoint(file: UploadFile = File(...)):
     """
-    Process an uploaded PDF file and extract its text content as markdown.
+    Process an uploaded PDF file, chunk it, and store in ChromaDB.
     
     Returns:
-        FileContext with name, markdown content, and token count
+        FileUploadResponse with name, token count, chunk count, and status
     """
     if not file.filename.lower().endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
     
     try:
         content = await file.read()
-        return process_pdf(file.filename, content)
+        
+        # Extract chunks with page metadata
+        chunks, metadatas, tokens = extract_pages_with_chunks(file.filename, content)
+        
+        if not chunks:
+            raise ValueError("Could not extract text from PDF")
+        
+        # Delete any existing chunks for this file (re-upload case)
+        delete_documents([file.filename])
+        
+        # Add to ChromaDB
+        chunk_count = add_documents(chunks, metadatas, file.filename)
+        
+        return FileUploadResponse(
+            name=file.filename,
+            tokens=tokens,
+            chunks=chunk_count,
+            status="uploaded"
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing PDF: {str(e)}")
+
+
+@app.delete("/api/files/clear")
+async def clear_files_endpoint():
+    """
+    Clear the entire file upload database.
+    Called when user clicks "clear all" or wants to start fresh.
+    
+    Returns:
+        Success status
+    """
+    try:
+        success = clear_database()
+        if success:
+            return {"status": "cleared", "message": "All files cleared successfully"}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to clear database")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error clearing files: {str(e)}")
 
 
 @app.post("/api/gemini/models")
@@ -156,24 +199,60 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
     current_message = request.conversation[-1]
     
     # Process web search if enabled
-    web_context, source_map = "", None
+    web_context, web_source_map = "", None
     if request.web_search:
-        web_context, source_map = await process_web_search(
+        web_context, web_source_map = await process_web_search(
             current_message.content, 
             request.tavily_api_key
         )
 
-    # Build file context if files provided
-    files_context = ""
+
+    # Clean up orphaned files in ChromaDB (files deleted from frontend)
+    # Get current files from request
+    current_filenames = [f.name for f in request.files] if request.files else []
+    
+    # Get all files in ChromaDB
+    db_filenames = get_all_filenames()
+    
+    # Find orphaned files (in DB but not in current request)
+    orphaned = [f for f in db_filenames if f not in current_filenames]
+    
+    # Delete orphaned files
+    if orphaned:
+        print(f"[CLEANUP] Found {len(orphaned)} orphaned file(s) in ChromaDB")
+        for filename in orphaned:
+            print(f"[CLEANUP] Deleting: {filename}")
+        delete_documents(orphaned)
+        print(f"[CLEANUP] Cleanup complete")
+
+    # Process file context via ChromaDB RAG if files provided
+    files_context, files_source_map = "", None
     if request.files:
-        files_context = build_file_context(request.files)
+        filenames = [f.name for f in request.files]
+        file_results = query_documents(
+            query=current_message.content,
+            n_results=5,
+            filenames=filenames
+        )
+        if file_results:
+            files_context, files_source_map = process_search_results(file_results)
+
+
+    # Merge source maps (offset file sources if web sources exist)
+    source_map = {}
+    if web_source_map:
+        source_map.update(web_source_map)
+    if files_source_map:
+        offset = len(source_map)
+        for key, value in files_source_map.items():
+            source_map[key + offset] = value
 
     # Combine contexts (only include non-empty parts)
     context_parts = []
     if web_context:
         context_parts.append(f"Web Search Results:\n{web_context}")
     if files_context:
-        context_parts.append(f"Uploaded Documents:\n{files_context}")
+        context_parts.append(f"Document Context:\n{files_context}")
     context = "\n\n".join(context_parts)
 
     # Build final prompt

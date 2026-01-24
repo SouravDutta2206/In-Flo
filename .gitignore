@@ -4,7 +4,11 @@
 /node_modules
 /data
 /python-backend/hf_cache
+/python-backend/chroma_db
 /python-backend/.venv
+/python-backend/__pycache__
+/python-backend/utils/__pycache__
+/python-backend/__pycache__
 
 # next.js
 /.next/
@@ -30,6 +34,3 @@ app_config.json*
 *.tsbuildinfo
 next-env.d.ts
 app.bat
-python-backend/utils/__pycache__/schemas.cpython-311.pyc
-python-backend/__pycache__/server.cpython-311.pyc
-python-backend/__pycache__/server.cpython-311.pyc

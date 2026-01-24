@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { ChevronDown, ExternalLink } from "lucide-react"
+import { ChevronDown, ExternalLink, FileText } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface Source {
@@ -13,6 +13,25 @@ interface Source {
 
 interface SourcesFooterProps {
   sources: Record<string, Source>
+}
+
+/**
+ * Checks if a source URL is a file reference (not a web URL).
+ */
+function isFileSource(url: string): boolean {
+  return !url.startsWith('http://') && !url.startsWith('https://')
+}
+
+/**
+ * Parses a file source URL like "document.pdf#page=3" into filename and page.
+ */
+function parseFileSource(url: string): { filename: string; page?: number } {
+  const [filename, fragment] = url.split('#')
+  const pageMatch = fragment?.match(/page=(\d+)/)
+  return {
+    filename,
+    page: pageMatch ? parseInt(pageMatch[1], 10) : undefined
+  }
 }
 
 /**
@@ -82,13 +101,17 @@ interface SourceCardProps {
 }
 
 export function SourceCard({ id, source }: SourceCardProps) {
+  const isFile = isFileSource(source.url)
+  const fileInfo = isFile ? parseFileSource(source.url) : null
+  
   const handleClick = () => {
-    if (source.url) {
+    // Only open external links for web sources
+    if (!isFile && source.url) {
       window.open(source.url, '_blank', 'noopener,noreferrer')
     }
   }
 
-  const domain = getDomain(source.url)
+  const domain = isFile ? fileInfo?.filename : getDomain(source.url)
   const snippet = source.snippet?.slice(0, 100) || ''
 
   return (
@@ -97,26 +120,42 @@ export function SourceCard({ id, source }: SourceCardProps) {
       className={cn(
         "flex-shrink-0 w-52 py-2 px-3 rounded-xl border border-border/50",
         "bg-muted/30 hover:bg-muted/60 hover:border-border",
-        "transition-all duration-200 cursor-pointer text-left",
+        "transition-all duration-200 text-left",
+        isFile ? "cursor-default" : "cursor-pointer",
         "group focus:outline-none focus:ring-2 focus:ring-primary/50"
       )}
     >
-      {/* Top row: [n] favicon domain | external link */}
-      <div className="flex items-center justify-between gap-2 h-10">
-        <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+      {/* Top row: [n] icon domain/filename | external link */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0 overflow-hidden flex-1">
           <span className="text-sm text-muted-foreground font-medium flex-shrink-0">[{id}]</span>
-          <img 
-            src={getFaviconUrl(source.url)} 
-            alt="" 
-            className="h-4 w-4 rounded-sm flex-shrink-0"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none'
-            }}
-          />
-          <span className="text-sm text-muted-foreground font-medium capitalize truncate">{domain}</span>
+          {isFile ? (
+            <FileText className="h-4 w-4 text-purple-400 flex-shrink-0" />
+          ) : (
+            <img 
+              src={getFaviconUrl(source.url)} 
+              alt="" 
+              className="h-4 w-4 rounded-sm flex-shrink-0"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none'
+              }}
+            />
+          )}
+          <span className="text-sm text-muted-foreground font-medium truncate">
+            {domain}
+          </span>
         </div>
-        <ExternalLink className="h-3 w-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors flex-shrink-0" />
+        {!isFile && (
+          <ExternalLink className="h-3 w-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors flex-shrink-0" />
+        )}
       </div>
+
+      {/* Page number for file sources - displayed separately */}
+      {isFile && fileInfo?.page && (
+        <div className="flex items-center gap-1 mt-1 ml-6">
+          <span className="text-xs font-medium text-purple-400">Page {fileInfo.page}</span>
+        </div>
+      )}
 
       {/* Snippet */}
       {snippet && (
@@ -127,3 +166,4 @@ export function SourceCard({ id, source }: SourceCardProps) {
     </button>
   )
 }
+

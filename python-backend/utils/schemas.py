@@ -16,10 +16,17 @@ class Message(BaseModel):
     content: str
 
 class FileContext(BaseModel):
-    """Represents an uploaded file with extracted text content."""
+    """Represents an uploaded file reference for chat context."""
     name: str
-    content: str
+    content: Optional[str] = None  # Optional - not sent from frontend in RAG mode
+    tokens: Optional[int] = None
+
+class FileUploadResponse(BaseModel):
+    """Response after uploading and processing a file."""
+    name: str
     tokens: int
+    chunks: int
+    status: str = "uploaded"
     
 class ChatRequest(BaseModel):
     conversation: List[Message]
