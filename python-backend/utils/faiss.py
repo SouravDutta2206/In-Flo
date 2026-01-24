@@ -3,16 +3,11 @@ FAISS module - handles document chunking, embedding, and similarity search.
 """
 import faiss
 import numpy as np
-from sentence_transformers import SentenceTransformer
 from langchain_classic.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from utils.sources import process_search_results
-
-# Configuration
-MODEL_NAME = "all-MiniLM-L6-v2"
-TOP_K = 5
-CHUNK_SIZE = 800
-CHUNK_OVERLAP = 80
+from utils.embeddings import get_embedding_model
+from config import CHUNK_SIZE, CHUNK_OVERLAP, TOP_K_RESULTS
 
 
 def chunk_docs(docs: list[Document]) -> list[Document]:
@@ -29,7 +24,7 @@ def chunk_docs(docs: list[Document]) -> list[Document]:
     return splitter.split_documents(docs)
 
 
-def build_index(chunks: list[Document], model: SentenceTransformer) -> faiss.Index:
+def build_index(chunks: list[Document], model) -> faiss.Index:
     """Build a FAISS HNSW index from document chunks."""
     texts = [doc.page_content for doc in chunks]
     embeddings = model.encode(
@@ -50,10 +45,10 @@ def build_index(chunks: list[Document], model: SentenceTransformer) -> faiss.Ind
 
 def search(
     query: str, 
-    model: SentenceTransformer, 
+    model, 
     index: faiss.Index, 
     chunks: list[Document], 
-    top_k: int = TOP_K
+    top_k: int = TOP_K_RESULTS
 ) -> list[tuple[str, float, str]]:
     """
     Search for similar chunks using FAISS.
@@ -77,7 +72,7 @@ def search(
 def faiss_search(
     chunks: list[Document], 
     user_query: str,
-    top_k: int = TOP_K
+    top_k: int = TOP_K_RESULTS
 ) -> tuple[str, dict[int, dict[str, any]]]:
     """
     Perform FAISS similarity search and return context + source map.
@@ -90,7 +85,7 @@ def faiss_search(
     Returns:
         Tuple of (context_string, source_map)
     """
-    model = SentenceTransformer(MODEL_NAME)
+    model = get_embedding_model()  # Uses singleton, no reload!
     index = build_index(chunks, model)
     results = search(user_query, model, index, chunks, top_k)
     
@@ -98,3 +93,4 @@ def faiss_search(
     del index
     
     return process_search_results(results)
+

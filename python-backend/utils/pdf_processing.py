@@ -6,9 +6,9 @@ sys.dont_write_bytecode = True
 
 import io
 import re
-from typing import List, Optional
+from typing import List
 from pypdf import PdfReader
-from utils.schemas import FileContext
+from config import CHUNK_SIZE, CHUNK_OVERLAP
 
 
 def clean_pdf_text(text: str) -> str:
@@ -76,8 +76,8 @@ def extract_pdf_text(file_content: bytes) -> str:
 def extract_pages_with_chunks(
     filename: str,
     file_content: bytes,
-    chunk_size: int = 800,
-    chunk_overlap: int = 80
+    chunk_size: int = CHUNK_SIZE,
+    chunk_overlap: int = CHUNK_OVERLAP
 ) -> tuple[List[str], List[dict], int]:
     """
     Extract PDF text as chunks with page metadata for vector storage.
@@ -129,44 +129,3 @@ def extract_pages_with_chunks(
     total_tokens = total_chars // 4
     
     return all_chunks, all_metadatas, total_tokens
-
-
-def build_file_context(files: Optional[List]) -> str:
-    """Build context string from uploaded files."""
-    if not files:
-        return ""
-    
-    context_parts = ["Documents provided:"]
-    for f in files:
-        context_parts.append(f"---\n[{f.name}]:\n{f.content}\n---")
-    
-    return "\n".join(context_parts)
-
-
-def process_pdf(filename: str, file_content: bytes) -> FileContext:
-    """
-    Process PDF file and return FileContext with extracted markdown content.
-    
-    Args:
-        filename: Name of the PDF file
-        file_content: Raw bytes of the PDF file
-        
-    Returns:
-        FileContext with name, markdown content, and token count
-        
-    Raises:
-        ValueError: If PDF is empty or cannot be processed
-    """
-    markdown_content = extract_pdf_text(file_content)
-    
-    if not markdown_content.strip():
-        raise ValueError("Could not extract text from PDF")
-    
-    # Estimate token count (rough heuristic: ~4 chars per token)
-    token_count = len(markdown_content) // 4
-    
-    return FileContext(
-        name=filename,
-        content=markdown_content,
-        tokens=token_count
-    )

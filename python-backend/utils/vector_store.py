@@ -7,36 +7,21 @@ sys.dont_write_bytecode = True
 
 import chromadb
 from chromadb import Documents, EmbeddingFunction, Embeddings
-from sentence_transformers import SentenceTransformer
 from typing import List, Tuple, Optional, Dict, Any
 import hashlib
 import shutil
 import os
-
-# Configuration - same model as faiss.py
-MODEL_NAME = "all-MiniLM-L6-v2"
-COLLECTION_NAME = "documents"
-DB_PATH = "./chroma_db/file_upload"
-TOP_K = 5
-
-# Singleton model instance
-_model: Optional[SentenceTransformer] = None
-
-
-def get_model() -> SentenceTransformer:
-    """Get or create the shared embedding model."""
-    global _model
-    if _model is None:
-        _model = SentenceTransformer(MODEL_NAME)
-    return _model
+import torch
+from config import CHROMA_DB_PATH, CHROMA_COLLECTION, TOP_K_RESULTS
+from utils.embeddings import get_embedding_model
 
 
 class LocalEmbeddingFunction(EmbeddingFunction):
     """Custom embedding function using local SentenceTransformer."""
     
     def __call__(self, input: Documents) -> Embeddings:
-        model = get_model()
-        embeddings = model.encode(input, convert_to_numpy=True, device="cuda" if torch.cuda.is_available() else "cpu")
+        model = get_embedding_model()  # Uses shared singleton
+        embeddings = model.encode(input, convert_to_numpy=True)
         return embeddings.tolist()
 
 
@@ -50,10 +35,10 @@ def get_collection():
     global _client, _collection
     if _collection is None:
         # Ensure the directory exists
-        os.makedirs(DB_PATH, exist_ok=True)
-        _client = chromadb.PersistentClient(path=DB_PATH)
+        os.makedirs(CHROMA_DB_PATH, exist_ok=True)
+        _client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
         _collection = _client.get_or_create_collection(
-            name=COLLECTION_NAME,
+            name=CHROMA_COLLECTION,
             embedding_function=LocalEmbeddingFunction()
         )
     return _collection
@@ -75,9 +60,9 @@ def clear_database() -> bool:
         _collection = None
         _client = None
         
-        if os.path.exists(DB_PATH):
-            shutil.rmtree(DB_PATH)
-            print(f"[VECTOR_STORE] Cleared database folder at {DB_PATH}")
+        if os.path.exists(CHROMA_DB_PATH):
+            shutil.rmtree(CHROMA_DB_PATH)
+            print(f"[VECTOR_STORE] Cleared database folder at {CHROMA_DB_PATH}")
             return True
         return True  # Folder doesn't exist, nothing to clear
         
@@ -87,20 +72,20 @@ def clear_database() -> bool:
         # Fallback: Delete and recreate collection if folder is locked
         try:
             # Re-initialize client since we cleared it
-            _client = chromadb.PersistentClient(path=DB_PATH)
+            _client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
             
             try:
-                _client.delete_collection(name=COLLECTION_NAME)
-                print(f"[VECTOR_STORE] Deleted collection '{COLLECTION_NAME}'")
+                _client.delete_collection(name=CHROMA_COLLECTION)
+                print(f"[VECTOR_STORE] Deleted collection '{CHROMA_COLLECTION}'")
             except Exception:
                 pass  # Collection might not exist
             
             # Recreate empty collection
             _collection = _client.get_or_create_collection(
-                name=COLLECTION_NAME,
+                name=CHROMA_COLLECTION,
                 embedding_function=LocalEmbeddingFunction()
             )
-            print(f"[VECTOR_STORE] Recreated empty collection '{COLLECTION_NAME}'")
+            print(f"[VECTOR_STORE] Recreated empty collection '{CHROMA_COLLECTION}'")
             return True
             
         except Exception as e2:
@@ -157,7 +142,7 @@ def add_documents(
 
 def query_documents(
     query: str,
-    n_results: int = TOP_K,
+    n_results: int = TOP_K_RESULTS,
     filenames: Optional[List[str]] = None
 ) -> List[Tuple[str, float, str]]:
     """

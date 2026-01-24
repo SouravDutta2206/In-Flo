@@ -94,13 +94,13 @@ async def search_and_scrape(
         ]
     
         exclusion_str = ' '.join([f'-site:{e}' for e in exclusions])
-        query = f"{query} {exclusion_str}"
+        search_query = f"{query} {exclusion_str}"
 
         urls = []
 
         try:
             print(f"[SEARCH] Trying DuckDuckGo search...")
-            urls = await search_duckduckgo(query, num_results=fetch_count)
+            urls = await search_duckduckgo(search_query, num_results=fetch_count)
         except Exception as e:
             print(f"[SEARCH] DuckDuckGo search failed: {e}")
             urls = []
@@ -108,7 +108,7 @@ async def search_and_scrape(
         if not urls:
             try:
                 print(f"[SEARCH] Trying Tavily search...")
-                urls = await search_tavily(query=query, exclusions=[e.replace('https://www.', '').replace('https://', '') for e in exclusions], api_key=tavily_api_key, num_results=fetch_count)
+                urls = await search_tavily(query=search_query, exclusions=[e.replace('https://www.', '').replace('https://', '') for e in exclusions], api_key=tavily_api_key, num_results=fetch_count)
             except Exception as e:
                 print(f"[SEARCH] Tavily search failed: {e}")
                 urls = []
@@ -134,24 +134,3 @@ async def search_and_scrape(
     
     # Trim to target count if we got more
     return successful_documents[:target_count]
-
-
-def search_and_scrape_sync(
-    query: str,
-    target_count: int = 5,
-    max_attempts: int = 5,
-) -> list[Document]:
-    """
-    Synchronous wrapper for search_and_scrape.
-    
-    Args:
-        query: Search query string
-        target_count: Number of successful results needed
-        max_attempts: Maximum search attempts to prevent infinite loops
-    
-    Returns:
-        List of LangChain Document objects
-    """
-    return asyncio.run(search_and_scrape(query, target_count, max_attempts))
-
-

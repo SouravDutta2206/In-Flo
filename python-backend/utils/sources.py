@@ -1,16 +1,7 @@
 """
 Sources module - handles source map creation and context formatting for RAG.
 """
-from dataclasses import dataclass
 from typing import Any
-
-
-@dataclass
-class Source:
-    """A single source with URL, relevance score, and snippet preview."""
-    url: str
-    score: float
-    snippet: str
 
 
 def build_source_map(

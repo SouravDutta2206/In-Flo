@@ -88,7 +88,7 @@ def clean_html(soup: BeautifulSoup) -> BeautifulSoup:
     for element in elements_to_remove:
         try:
             element.decompose()
-        except:
+        except Exception:
             pass
     
     # Remove link lists (ul/ol that are mostly links)
@@ -99,7 +99,7 @@ def clean_html(soup: BeautifulSoup) -> BeautifulSoup:
             if link_items / len(items) > 0.7:  # More than 70% are link items
                 try:
                     list_elem.decompose()
-                except:
+                except Exception:
                     pass
     
     # Remove standalone links that aren't part of text content
@@ -116,7 +116,7 @@ def clean_html(soup: BeautifulSoup) -> BeautifulSoup:
     for a_tag in links_to_remove:
         try:
             a_tag.decompose()
-        except:
+        except Exception:
             pass
     
     # Remove divs that are primarily links
@@ -133,7 +133,7 @@ def clean_html(soup: BeautifulSoup) -> BeautifulSoup:
     for div in divs_to_remove:
         try:
             div.decompose()
-        except:
+        except Exception:
             pass
     
     # Remove empty elements
@@ -141,7 +141,7 @@ def clean_html(soup: BeautifulSoup) -> BeautifulSoup:
         try:
             if element.name and not element.get_text(strip=True):
                 element.decompose()
-        except:
+        except Exception:
             pass
     
     return soup
