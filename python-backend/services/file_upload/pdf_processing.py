@@ -9,6 +9,7 @@ import re
 from typing import List
 from pypdf import PdfReader
 from config import CHUNK_SIZE, CHUNK_OVERLAP
+from utils.chunking import split_text
 
 
 def clean_pdf_text(text: str) -> str:
@@ -94,17 +95,8 @@ def extract_pages_with_chunks(
         - metadatas: List of {"filename": str, "page": int} dicts
         - total_tokens: Estimated total token count
     """
-    from langchain_classic.text_splitter import RecursiveCharacterTextSplitter
-    
     pdf_file = io.BytesIO(file_content)
     reader = PdfReader(pdf_file)
-    
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        length_function=len,
-        separators=["\n\n", "\n", ".", "?", "!", " ", ""]
-    )
     
     all_chunks = []
     all_metadatas = []
@@ -116,8 +108,8 @@ def extract_pages_with_chunks(
             cleaned_text = clean_pdf_text(page_text)
             if cleaned_text.strip():
                 total_chars += len(cleaned_text)
-                # Split this page's text into chunks
-                page_chunks = splitter.split_text(cleaned_text)
+                # Split this page's text into chunks using shared utility
+                page_chunks = split_text(cleaned_text, chunk_size, chunk_overlap)
                 for chunk in page_chunks:
                     all_chunks.append(chunk)
                     all_metadatas.append({

@@ -3,25 +3,16 @@ FAISS module - handles document chunking, embedding, and similarity search.
 """
 import faiss
 import numpy as np
-from langchain_classic.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from utils.sources import process_search_results
 from utils.embeddings import get_embedding_model
-from config import CHUNK_SIZE, CHUNK_OVERLAP, TOP_K_RESULTS
+from utils.chunking import split_documents
+from config import TOP_K_RESULTS
 
 
 def chunk_docs(docs: list[Document]) -> list[Document]:
     """Split documents into smaller chunks for embedding."""
-    if not docs:
-        return []
-
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=CHUNK_SIZE,
-        chunk_overlap=CHUNK_OVERLAP,
-        length_function=len,
-        separators=["\n\n", "\n", ".", "?", "!", " ", ""]
-    )
-    return splitter.split_documents(docs)
+    return split_documents(docs)
 
 
 def build_index(chunks: list[Document], model) -> faiss.Index:
