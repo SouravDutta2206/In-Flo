@@ -5,7 +5,7 @@ import faiss
 import numpy as np
 from langchain_core.documents import Document
 from utils.sources import process_search_results
-from utils.embeddings import get_embedding_model
+from utils.embeddings import FastEmbedModel
 from utils.chunking import split_documents
 from config import TOP_K_RESULTS
 
@@ -18,12 +18,7 @@ def chunk_docs(docs: list[Document]) -> list[Document]:
 def build_index(chunks: list[Document], model) -> faiss.Index:
     """Build a FAISS HNSW index from document chunks."""
     texts = [doc.page_content for doc in chunks]
-    embeddings = model.encode(
-        texts, 
-        batch_size=64, 
-        convert_to_numpy=True, 
-        show_progress_bar=False
-    ).astype(np.float32)
+    embeddings = model.encode(texts)
     
     dim = embeddings.shape[1]
     index = faiss.IndexHNSWFlat(dim, 32)
@@ -47,7 +42,7 @@ def search(
     Returns:
         List of (chunk_content, score, source_url) tuples
     """
-    query_embedding = model.encode([query], convert_to_numpy=True).astype(np.float32)
+    query_embedding = model.encode([query])
     distances, indices = index.search(query_embedding, top_k)
     
     return [
@@ -76,7 +71,7 @@ def faiss_search(
     Returns:
         Tuple of (context_string, source_map)
     """
-    model = get_embedding_model()  # Uses singleton, no reload!
+    model = FastEmbedModel()
     index = build_index(chunks, model)
     results = search(user_query, model, index, chunks, top_k)
     

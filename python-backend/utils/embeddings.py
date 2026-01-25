@@ -1,37 +1,31 @@
 """
 Shared embedding model singleton for consistent embeddings across modules.
-This ensures the SentenceTransformer model is loaded only once.
+Supports both SentenceTransformers and FastEmbed providers.
 """
 import sys
 sys.dont_write_bytecode = True
 
+import numpy as np
 import torch
-from typing import Optional
-from sentence_transformers import SentenceTransformer
+from typing import Optional, Protocol, Union
 from config import EMBEDDING_MODEL
+from fastembed import TextEmbedding
 
-# Singleton model instance
-_model: Optional[SentenceTransformer] = None
-
-
-def get_embedding_model() -> SentenceTransformer:
-    """
-    Get or create the shared embedding model.
+class EmbeddingModel(Protocol):
+    """Protocol for embedding models - both providers implement this interface."""
     
-    This function ensures the model is only loaded once and reused
-    across all modules that need embeddings.
+    def encode(self, texts: list[str], **kwargs) -> np.ndarray:
+        """Encode texts to embeddings as numpy array."""
+        ...
+
+class FastEmbedModel:
+    """Wrapper for FastEmbed to match our interface."""
     
-    Returns:
-        SentenceTransformer model instance
-    """
-    global _model
-    if _model is None:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        _model = SentenceTransformer(EMBEDDING_MODEL, device=device)
-        print(f"[EMBEDDINGS] Loaded model '{EMBEDDING_MODEL}' on {device}")
-    return _model
-
-
-def get_device() -> str:
-    """Get the device being used for embeddings."""
-    return "cuda" if torch.cuda.is_available() else "cpu"
+    def __init__(self, model_name: str = EMBEDDING_MODEL):
+        providers = ["CUDAExecutionProvider"] if torch.cuda.is_available() else ["CPUExecutionProvider"]
+        self.model = TextEmbedding(model_name=model_name, providers=providers)
+    
+    def encode(self, texts: list[str], **kwargs) -> np.ndarray:
+        """Encode texts using FastEmbed."""
+        embeddings = list(self.model.embed(texts))
+        return np.array(embeddings, dtype=np.float32)

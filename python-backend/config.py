@@ -6,7 +6,10 @@ import sys
 sys.dont_write_bytecode = True
 
 # Embedding model configuration
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+# Provider: "sentence-transformers" or "fastembed"
+import os
+
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 # Text chunking configuration
 CHUNK_SIZE = 800

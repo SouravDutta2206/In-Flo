@@ -5,23 +5,23 @@ Uses the same SentenceTransformer model as faiss.py for consistency.
 import sys
 sys.dont_write_bytecode = True
 
+import torch
 import chromadb
 from chromadb import Documents, EmbeddingFunction, Embeddings
 from typing import List, Tuple, Optional, Dict, Any
 import hashlib
 import shutil
 import os
-import torch
 from config import CHROMA_DB_PATH, CHROMA_COLLECTION, TOP_K_RESULTS
-from utils.embeddings import get_embedding_model
+from utils.embeddings import FastEmbedModel
 
 
 class LocalEmbeddingFunction(EmbeddingFunction):
     """Custom embedding function using local SentenceTransformer."""
     
     def __call__(self, input: Documents) -> Embeddings:
-        model = get_embedding_model()  # Uses shared singleton
-        embeddings = model.encode(input, convert_to_numpy=True)
+        model = FastEmbedModel()
+        embeddings = model.encode(input)
         return embeddings.tolist()
 
 
