@@ -21,3 +21,7 @@ TOP_K_RESULTS = 5
 # ChromaDB configuration
 CHROMA_DB_PATH = "./chroma_db/file_upload"
 CHROMA_COLLECTION = "documents"
+
+# Query expansion configuration
+ENABLE_QUERY_EXPANSION = True  # Master toggle for query expansion
+QUERY_EXPANSION_MAX_HISTORY = 5  # Number of previous messages to consider

@@ -4,11 +4,12 @@ Chat routes - handles the main chat endpoint with streaming support.
 import sys
 sys.dont_write_bytecode = True
 
+import re
 import time
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 
-from utils.prompts import base_prompt, prompt_with_context
+from utils.prompts import PROMPT_WITH_CONTEXT, BASE_PROMPT
 from utils.schemas import ChatRequest, Message, RequestState
 from providers import chat_stream
 from services.web_search.search import search_and_scrape as search
@@ -52,11 +53,18 @@ async def process_web_search(
 def build_prompt(query: str, context: str, source_map: Optional[dict]) -> Message:
     """Build the formatted prompt message with or without context."""
     if context:
-        formatted = prompt_with_context(context=context, query=query, source_map=source_map or {})
+        content = PROMPT_WITH_CONTEXT.format(
+            context=context,
+            query=query,
+            source_map=source_map or {}
+        )
     else:
-        formatted = base_prompt(query)
+        content = f"{query}{BASE_PROMPT}"
     
-    return Message(role="user", content=formatted[0]["content"])
+    content = re.sub(r"[^\S\n]+", " ", content)
+    
+    return Message(role="user", content=content)
+
 
 
 @router.post("/api/chat")
@@ -91,8 +99,18 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
     # Process web search if enabled
     web_context, web_source_map = "", None
     if request.web_search:
+        # Expand query using conversation context
+        from services.web_search.query_expander import expand_search_query
+        expanded_query = await expand_search_query(
+            query=current_message.content,
+            conversation_history=history,
+            model=request.model
+        )
+        print(f"[QUERY EXPANSION] Original: '{current_message.content[:80]}...'")
+        print(f"[QUERY EXPANSION] Expanded: '{expanded_query}'")
+        
         web_context, web_source_map = await process_web_search(
-            current_message.content, 
+            expanded_query, 
             request.tavily_api_key
         )
 

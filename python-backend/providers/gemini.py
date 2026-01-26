@@ -11,6 +11,29 @@ from google.genai import types
 from utils.prompts import gemini_prompt_format
 from utils.schemas import ChatRequest
 
+def gemini_prompt_format(prompt: list):
+
+    content = []
+
+    for i, message in enumerate(prompt):
+
+        if message.role == "user":
+            content.append(types.Content(
+                role="user",
+                parts=[
+                    types.Part.from_text(text=f"""{message.content}"""),
+                ],
+            ))
+            
+        if message.role == "assistant":
+            content.append(types.Content(
+                role="model",
+                parts=[
+                    types.Part.from_text(text=f"""{message.content}"""),
+                ],
+            ))
+
+    return content
 
 async def gemini_chunks(request: ChatRequest) -> AsyncIterator[tuple[str, Optional[str]]]:
     """Extract content and thinking chunks from Gemini stream."""
