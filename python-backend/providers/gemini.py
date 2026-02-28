@@ -1,14 +1,9 @@
 """
 Gemini provider - Google Gemini API streaming with thinking support.
 """
-import sys
-sys.dont_write_bytecode = True
-
 from typing import AsyncIterator, Optional
 from google import genai
 from google.genai import types
-
-from utils.prompts import gemini_prompt_format
 from utils.schemas import ChatRequest
 
 def gemini_prompt_format(prompt: list):
@@ -69,3 +64,15 @@ async def gemini_chunks(request: ChatRequest) -> AsyncIterator[tuple[str, Option
             
             if content or thinking:
                 yield (content, thinking or None)
+
+
+async def gemini_completion(request: ChatRequest) -> str:
+    """Non-streaming chat completion for Gemini."""
+    client = genai.Client(api_key=request.model.key)
+    prompt = gemini_prompt_format(request.conversation)
+    
+    response = client.models.generate_content(
+        model=request.model.name,
+        contents=prompt
+    )
+    return response.text.strip()

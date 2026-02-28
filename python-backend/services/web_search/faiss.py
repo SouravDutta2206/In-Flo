@@ -2,7 +2,6 @@
 FAISS module - handles document chunking, embedding, and similarity search.
 """
 import faiss
-import numpy as np
 from langchain_core.documents import Document
 from utils.sources import process_search_results
 from utils.embeddings import FastEmbedModel

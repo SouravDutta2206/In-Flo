@@ -1,9 +1,6 @@
 """
 Ollama provider - local LLM streaming via Ollama.
 """
-import sys
-sys.dont_write_bytecode = True
-
 from typing import AsyncIterator, Optional
 import ollama
 
@@ -22,3 +19,10 @@ async def ollama_chunks(request: ChatRequest) -> AsyncIterator[tuple[str, Option
             thinking = message.get('thinking')
             if content or thinking:
                 yield (content, thinking)
+
+
+async def ollama_completion(request: ChatRequest) -> str:
+    """Non-streaming chat completion for Ollama."""
+    messages = convert_messages(request.conversation)
+    response = ollama.chat(model=request.model.name, messages=messages, stream=False)
+    return response.get('message', {}).get('content', '').strip()

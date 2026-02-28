@@ -42,6 +42,22 @@ Format your response as follows:
 6. If relevant, include any headings or subheadings to structure your response.
 7. Ensure proper grammar, punctuation, and spelling throughout your answer."""
 
+# Query Expansion Prompt
+QUERY_EXPANSION_PROMPT = """You are a search query optimizer. Your task is to analyze the conversation context and generate an optimized web search query.
+
+{conversation_context}
+
+Current User Question:
+{user_query}
+
+Generate a concise, keyword-rich search query (under 100 characters) that will help find the most relevant information on the web. Consider:
+1. Key entities and topics from the conversation
+2. Specific details mentioned by the user
+3. Temporal context (if the user wants recent/latest information, include that)
+4. Remove conversational fluff, keep only search-relevant terms
+
+Output ONLY the optimized search query, nothing else."""
+
 
 
 

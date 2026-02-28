@@ -1,9 +1,6 @@
 """
 Text chunking utilities - shared text splitting functions.
 """
-import sys
-sys.dont_write_bytecode = True
-
 from langchain_classic.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
 from config import CHUNK_SIZE, CHUNK_OVERLAP

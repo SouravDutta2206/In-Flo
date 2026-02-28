@@ -2,14 +2,12 @@
 Shared embedding model singleton for consistent embeddings across modules.
 Supports both SentenceTransformers and FastEmbed providers.
 """
-import sys
-sys.dont_write_bytecode = True
-
 import numpy as np
 import torch
 from typing import Optional, Protocol, Union
 from config import EMBEDDING_MODEL
 from fastembed import TextEmbedding
+from chromadb import Documents, EmbeddingFunction, Embeddings
 
 class EmbeddingModel(Protocol):
     """Protocol for embedding models - both providers implement this interface."""
@@ -29,3 +27,17 @@ class FastEmbedModel:
         """Encode texts using FastEmbed."""
         embeddings = list(self.model.embed(texts))
         return np.array(embeddings, dtype=np.float32)
+
+
+# ChromaDB embedding adapter
+try:
+    class ChromaEmbeddingAdapter(EmbeddingFunction):
+        """Adapter for using FastEmbedModel with ChromaDB."""
+        
+        def __call__(self, input: Documents) -> Embeddings:
+            model = FastEmbedModel()
+            embeddings = model.encode(input)
+            return embeddings.tolist()
+except ImportError:
+    # ChromaDB not installed, skip adapter
+    pass

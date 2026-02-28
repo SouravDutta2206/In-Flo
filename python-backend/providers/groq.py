@@ -1,9 +1,6 @@
 """
 Groq provider - Groq API streaming with thinking/reasoning support.
 """
-import sys
-sys.dont_write_bytecode = True
-
 from typing import AsyncIterator, Optional
 from groq import Groq
 
@@ -70,3 +67,15 @@ async def groq_chunks(request: ChatRequest) -> AsyncIterator[tuple[str, Optional
         
         if result_content or result_thinking:
             yield (result_content, result_thinking or None)
+
+
+async def groq_completion(request: ChatRequest) -> str:
+    """Non-streaming chat completion for Groq."""
+    client = Groq(api_key=request.model.key)
+    messages = convert_messages(request.conversation)
+    response = client.chat.completions.create(
+        model=request.model.name,
+        messages=messages,
+        stream=False,
+    )
+    return response.choices[0].message.content.strip()

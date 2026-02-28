@@ -2,9 +2,6 @@
 Centralized configuration for the Python backend.
 All shared constants are defined here to avoid duplication.
 """
-import sys
-sys.dont_write_bytecode = True
-
 # Embedding model configuration
 # Provider: "sentence-transformers" or "fastembed"
 import os
@@ -25,3 +22,7 @@ CHROMA_COLLECTION = "documents"
 # Query expansion configuration
 ENABLE_QUERY_EXPANSION = True  # Master toggle for query expansion
 QUERY_EXPANSION_MAX_HISTORY = 5  # Number of previous messages to consider
+
+# Logging configuration
+# Options: "DEBUG", "INFO", "WARNING", "ERROR"
+LOG_LEVEL = "DEBUG"  # Set to "DEBUG" to see all debug messages

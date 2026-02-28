@@ -1,28 +1,17 @@
 """
 Vector store module - ChromaDB-based document storage and retrieval.
-Uses the same SentenceTransformer model as faiss.py for consistency.
 """
-import sys
-sys.dont_write_bytecode = True
-
 import torch
 import chromadb
-from chromadb import Documents, EmbeddingFunction, Embeddings
 from typing import List, Tuple, Optional, Dict, Any
 import hashlib
 import shutil
 import os
 from config import CHROMA_DB_PATH, CHROMA_COLLECTION, TOP_K_RESULTS
-from utils.embeddings import FastEmbedModel
+from utils.embeddings import ChromaEmbeddingAdapter
+from utils.logging import vector_store_logger
 
-
-class LocalEmbeddingFunction(EmbeddingFunction):
-    """Custom embedding function using local SentenceTransformer."""
-    
-    def __call__(self, input: Documents) -> Embeddings:
-        model = FastEmbedModel()
-        embeddings = model.encode(input)
-        return embeddings.tolist()
+log = vector_store_logger()
 
 
 # Singleton ChromaDB client
@@ -34,68 +23,73 @@ def get_collection():
     """Get or create the ChromaDB collection."""
     global _client, _collection
     if _collection is None:
-        # Ensure the directory exists
         os.makedirs(CHROMA_DB_PATH, exist_ok=True)
         _client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
         _collection = _client.get_or_create_collection(
             name=CHROMA_COLLECTION,
-            embedding_function=LocalEmbeddingFunction()
+            embedding_function=ChromaEmbeddingAdapter()
         )
     return _collection
+
+
+def _reset_database():
+    """Reset database references."""
+    global _client, _collection
+    _collection = None
+    _client = None
+
+
+def _try_delete_folder() -> bool:
+    """Try to delete the database folder. Returns True if successful."""
+    if os.path.exists(CHROMA_DB_PATH):
+        shutil.rmtree(CHROMA_DB_PATH)
+        log.info(f"Cleared database folder at {CHROMA_DB_PATH}")
+    return True
+
+
+def _try_recreate_collection() -> bool:
+    """Fallback: delete and recreate collection if folder is locked."""
+    global _client, _collection
+    
+    _client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+    
+    try:
+        _client.delete_collection(name=CHROMA_COLLECTION)
+        log.info(f"Deleted collection '{CHROMA_COLLECTION}'")
+    except Exception:
+        pass  # Collection might not exist
+    
+    _collection = _client.get_or_create_collection(
+        name=CHROMA_COLLECTION,
+        embedding_function=ChromaEmbeddingAdapter()
+    )
+    log.info(f"Recreated empty collection '{CHROMA_COLLECTION}'")
+    return True
 
 
 def clear_database() -> bool:
     """
     Clear the entire ChromaDB database.
-    First tries to delete the folder, if that fails (file locked), deletes the collection instead.
+    First tries to delete the folder, if that fails (file locked), 
+    falls back to deleting and recreating the collection.
     
     Returns:
         True if cleared successfully, False otherwise
     """
-    global _client, _collection
+    _reset_database()
     
-    # First, try to delete the folder (cleanest approach)
     try:
-        # Reset singleton references first
-        _collection = None
-        _client = None
-        
-        if os.path.exists(CHROMA_DB_PATH):
-            shutil.rmtree(CHROMA_DB_PATH)
-            print(f"[VECTOR_STORE] Cleared database folder at {CHROMA_DB_PATH}")
-            return True
-        return True  # Folder doesn't exist, nothing to clear
-        
+        return _try_delete_folder()
     except (PermissionError, OSError) as e:
-        print(f"[VECTOR_STORE] Folder deletion failed (in use), falling back to collection deletion: {e}")
-        
-        # Fallback: Delete and recreate collection if folder is locked
+        log.warning(f"Folder deletion failed: {e}")
         try:
-            # Re-initialize client since we cleared it
-            _client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
-            
-            try:
-                _client.delete_collection(name=CHROMA_COLLECTION)
-                print(f"[VECTOR_STORE] Deleted collection '{CHROMA_COLLECTION}'")
-            except Exception:
-                pass  # Collection might not exist
-            
-            # Recreate empty collection
-            _collection = _client.get_or_create_collection(
-                name=CHROMA_COLLECTION,
-                embedding_function=LocalEmbeddingFunction()
-            )
-            print(f"[VECTOR_STORE] Recreated empty collection '{CHROMA_COLLECTION}'")
-            return True
-            
+            return _try_recreate_collection()
         except Exception as e2:
-            print(f"[VECTOR_STORE] Error in fallback collection deletion: {e2}")
+            log.error(f"Collection recreation failed: {e2}")
             return False
-    
     except Exception as e:
-        print(f"[VECTOR_STORE] Error clearing database: {e}")
+        log.error(f"Error clearing database: {e}")
         return False
-
 
 def generate_chunk_id(filename: str, page: int, chunk_index: int) -> str:
     """Generate a unique ID for a chunk."""
@@ -247,4 +241,27 @@ def get_all_filenames() -> List[str]:
             filenames.add(metadata["filename"])
     
     return list(filenames)
+
+
+def cleanup_orphaned_files(current_filenames: List[str]) -> int:
+    """
+    Delete files from ChromaDB that are not in the current list.
+    
+    Args:
+        current_filenames: List of filenames that should be kept
+        
+    Returns:
+        Number of orphaned files deleted
+    """
+    db_filenames = get_all_filenames()
+    orphaned = [f for f in db_filenames if f not in current_filenames]
+    
+    if orphaned:
+        log.info(f"Found {len(orphaned)} orphaned file(s)")
+        for filename in orphaned:
+            log.debug(f"Deleting: {filename}")
+        delete_documents(orphaned)
+        log.info("Cleanup complete")
+    
+    return len(orphaned)
 

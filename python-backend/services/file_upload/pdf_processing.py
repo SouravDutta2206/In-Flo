@@ -1,9 +1,6 @@
 """
 PDF processing module - handles PDF text extraction and markdown formatting.
 """
-import sys
-sys.dont_write_bytecode = True
-
 import io
 import re
 from typing import List

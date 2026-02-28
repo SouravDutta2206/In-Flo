@@ -1,9 +1,6 @@
 """
 OpenRouter provider - OpenRouter API streaming (OpenAI-compatible).
 """
-import sys
-sys.dont_write_bytecode = True
-
 from typing import AsyncIterator, Optional
 from openai import OpenAI
 
@@ -27,3 +24,15 @@ async def openrouter_chunks(request: ChatRequest) -> AsyncIterator[tuple[str, Op
             reasoning = getattr(delta, 'reasoning', None)
             if content or reasoning:
                 yield (content, reasoning)
+
+
+async def openrouter_completion(request: ChatRequest) -> str:
+    """Non-streaming chat completion for OpenRouter."""
+    client = OpenAI(api_key=request.model.key, base_url='https://openrouter.ai/api/v1')
+    messages = convert_messages(request.conversation)
+    response = client.chat.completions.create(
+        model=request.model.name,
+        messages=messages,
+        stream=False,
+    )
+    return response.choices[0].message.content.strip()

@@ -13,6 +13,9 @@ import httpx
 from bs4 import BeautifulSoup, Comment
 from langchain_core.documents import Document
 from markdownify import markdownify as md
+from utils.logging import scraper_logger
+
+log = scraper_logger()
 
 
 @dataclass
@@ -220,16 +223,16 @@ def html_to_markdown(html: str, base_url: str = "") -> tuple[Optional[str], str]
 
 async def fetch_url(client: httpx.AsyncClient, url: str) -> ScrapedPage:
     """Fetch a single URL and convert to markdown."""
-    print(f"[START] {url}")
+    log.info(f"[START] {url}")
     try:
         response = await client.get(url, follow_redirects=True)
         response.raise_for_status()
-        print(f"[FETCH] {url}")
+        log.info(f"[FETCH] {url}")
         
         # Check if it's HTML
         content_type = response.headers.get('content-type', '')
         if 'text/html' not in content_type.lower():
-            print(f"[ERROR] {url} - Not HTML content: {content_type}")
+            log.warning(f"[ERROR] {url} - Not HTML: {content_type}")
             return ScrapedPage(
                 url=url,
                 title=None,
@@ -242,7 +245,7 @@ async def fetch_url(client: httpx.AsyncClient, url: str) -> ScrapedPage:
         
         # Discard results with empty markdown content
         if not markdown or not markdown.strip():
-            print(f"[ERROR] {url} - Empty content after extraction")
+            log.warning(f"[ERROR] {url} - Empty content")
             return ScrapedPage(
                 url=url,
                 title=title,
@@ -251,7 +254,7 @@ async def fetch_url(client: httpx.AsyncClient, url: str) -> ScrapedPage:
                 error="Empty content after extraction"
             )
         
-        print(f"[COMPLETE] {url}")
+        log.info(f"[COMPLETE] {url}")
         return ScrapedPage(
             url=url,
             title=title,
@@ -260,13 +263,13 @@ async def fetch_url(client: httpx.AsyncClient, url: str) -> ScrapedPage:
         )
         
     except httpx.TimeoutException:
-        print(f"[ERROR] {url} - Timeout")
+        log.warning(f"{url} - Timeout")
         return ScrapedPage(url=url, title=None, markdown="", success=False, error="Timeout")
     except httpx.HTTPStatusError as e:
-        print(f"[ERROR] {url} - HTTP {e.response.status_code}")
+        log.warning(f"{url} - HTTP {e.response.status_code}")
         return ScrapedPage(url=url, title=None, markdown="", success=False, error=f"HTTP {e.response.status_code}")
     except Exception as e:
-        print(f"[ERROR] {url} - {str(e)}")
+        log.error(f"{url} - {str(e)}")
         return ScrapedPage(url=url, title=None, markdown="", success=False, error=str(e))
 
 
@@ -310,7 +313,7 @@ async def scrape_urls(
     successful_pages = [r for r in results if r.success]
     discarded_count = len(results) - len(successful_pages)
     if discarded_count > 0:
-        print(f"\n[INFO] Discarded {discarded_count} failed result(s)")
+        log.info(f"Discarded {discarded_count} failed result(s)")
     
     # Convert to LangChain Documents
     documents = [page.to_document() for page in successful_pages]

@@ -2,6 +2,9 @@
 Sources module - handles source map creation and context formatting for RAG.
 """
 from typing import Any
+from utils.logging import sources_logger
+
+log = sources_logger()
 
 
 def build_source_map(
@@ -68,6 +71,6 @@ def process_search_results(
     context = format_context(results)
     source_map = build_source_map(results, snippet_length)
     
-    print(f"\nProcessed {len(results)} sources, context length: {len(context)}")
+    log.info(f"Processed {len(results)} sources, context length: {len(context)}")
     
     return context, source_map

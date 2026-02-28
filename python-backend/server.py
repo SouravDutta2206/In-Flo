@@ -10,6 +10,9 @@ from contextlib import asynccontextmanager
 
 from services.file_upload.vector_store import clear_database
 from routes import router
+from utils.logging import server_logger
+
+log = server_logger()
 
 
 app = FastAPI(
@@ -32,13 +35,13 @@ async def lifespan(app: FastAPI):
     """Manage app lifecycle - initialize and cleanup request tracking."""
     # Clear file upload database at startup for fresh state
     clear_database()
-    print("[STARTUP] File upload database cleared")
+    log.info("File upload database cleared")
     
     app.state.active_requests = set()
-    print("Server started, request tracking initialized")
+    log.info("Server started, request tracking initialized")
     yield
     app.state.active_requests.clear()
-    print("Server shutdown, request tracking cleared")
+    log.info("Server shutdown, request tracking cleared")
 
 app.router.lifespan_context = lifespan
 

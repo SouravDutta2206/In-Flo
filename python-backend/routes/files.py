@@ -1,9 +1,6 @@
 """
 Files routes - handles file upload and management endpoints.
 """
-import sys
-sys.dont_write_bytecode = True
-
 from fastapi import APIRouter, HTTPException, UploadFile, File
 
 from utils.schemas import FileUploadResponse

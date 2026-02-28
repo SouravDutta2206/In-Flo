@@ -8,6 +8,9 @@ from langchain_core.documents import Document
 from ddgs import DDGS
 from services.web_search.scraper import scrape_urls_async
 from tavily import TavilyClient
+from utils.logging import search_logger
+
+log = search_logger()
 
 
 async def search_duckduckgo(query: str, num_results: int = 10) -> list[str]:
@@ -74,7 +77,7 @@ async def search_and_scrape(
     attempt = 0
     offset = 0
     
-    print(f"\n[SEARCH] Query: '{query}' | Target: {target_count} results\n")
+    log.info(f"Query: '{query}' | Target: {target_count} results")
     
     while len(successful_documents) < target_count and attempt < max_attempts:
         
@@ -83,7 +86,7 @@ async def search_and_scrape(
         
         # Fetch more URLs than needed to account for failures
         fetch_count = needed + 5 + offset
-        print(f"[SEARCH] Attempt {attempt}: Fetching {fetch_count} URLs...")
+        log.debug(f"Attempt {attempt}: Fetching {fetch_count} URLs")
 
         exclusions = [
         'https://en.wikipedia.org',
@@ -99,18 +102,18 @@ async def search_and_scrape(
         urls = []
 
         try:
-            print(f"[SEARCH] Trying DuckDuckGo search...")
+            log.debug("Trying DuckDuckGo search")
             urls = await search_duckduckgo(search_query, num_results=fetch_count)
         except Exception as e:
-            print(f"[SEARCH] DuckDuckGo search failed: {e}")
+            log.warning(f"DuckDuckGo search failed: {e}")
             urls = []
         
         if not urls:
             try:
-                print(f"[SEARCH] Trying Tavily search...")
+                log.debug("Trying Tavily search")
                 urls = await search_tavily(query=search_query, exclusions=[e.replace('https://www.', '').replace('https://', '') for e in exclusions], api_key=tavily_api_key, num_results=fetch_count)
             except Exception as e:
-                print(f"[SEARCH] Tavily search failed: {e}")
+                log.warning(f"Tavily search failed: {e}")
                 urls = []
 
         # Filter out already seen URLs
@@ -118,10 +121,10 @@ async def search_and_scrape(
         seen_urls.update(new_urls)
         
         if not new_urls:
-            print(f"[SEARCH] No new URLs found, stopping.")
+            log.debug("No new URLs found, stopping")
             break
         
-        print(f"[SEARCH] Found {len(new_urls)} new URLs to scrape\n")
+        log.debug(f"Found {len(new_urls)} new URLs to scrape")
         
         # Scrape the new URLs (returns Documents now)
         documents = await scrape_urls_async(new_urls)
@@ -130,7 +133,7 @@ async def search_and_scrape(
         # Increase offset for next search to get different results
         offset += fetch_count
         
-        print(f"\n[SEARCH] Progress: {len(successful_documents)}/{target_count} successful\n")
+        log.info(f"Progress: {len(successful_documents)}/{target_count} successful")
     
     # Trim to target count if we got more
     return successful_documents[:target_count]

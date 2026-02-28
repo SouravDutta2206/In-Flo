@@ -1,9 +1,6 @@
 """
 Base utilities for all LLM providers - shared streaming and formatting functions.
 """
-import sys
-sys.dont_write_bytecode = True
-
 import asyncio
 import json
 from typing import AsyncIterator, Optional, Union

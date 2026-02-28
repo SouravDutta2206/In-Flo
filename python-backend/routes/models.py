@@ -1,9 +1,6 @@
 """
 Models routes - handles model listing endpoints.
 """
-import sys
-sys.dont_write_bytecode = True
-
 from fastapi import APIRouter, HTTPException
 
 from utils.schemas import ModelResponse, ModelRequest, ModelID
