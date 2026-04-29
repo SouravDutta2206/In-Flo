@@ -39,22 +39,22 @@ export default function ChatInterface() {
   }
 
   return (
-    <div className="flex w-screen h-screen overflow-hidden bg-background">
+    <div className="flex w-screen h-screen overflow-hidden bg-background relative">
       {/* Sidebar */}
       <div
         className={`${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border transform transition-transform duration-200 ease-in-out md:translate-x-0 md:static md:z-0`}
+        } fixed inset-y-0 left-0 z-50 w-64 bg-card border-r border-border transform transition-transform duration-200 ease-in-out md:translate-x-0 md:static md:z-30`}
       >
         <Sidebar onClose={() => setSidebarOpen(false)} />
       </div>
 
       {/* Main content */}
-      <div className="z-40 flex flex-col flex-1 h-full overflow-y-auto">
+      <div className="flex-1 flex flex-col min-w-0 relative z-10 transition-colors duration-300 bg-background">
         <ChatHeader toggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
 
-        <div className="flex-1 flex flex-col items-center relative bg-background pb-8">
-          <div className="w-full max-w-7xl h-full flex flex-col px-4">
+        <div className="flex-1 overflow-y-auto">
+          <div className="w-full max-w-7xl mx-auto h-full flex flex-col px-4 pt-4 pb-8">
             {!currentChat ? (
               <WelcomeScreen onSentenceClick={handleSentenceClick} />
             ) : (
@@ -67,14 +67,15 @@ export default function ChatInterface() {
           </div>
         </div>
 
-        <ChatInput 
-          input={input}
-          setInput={setInput}
-          isSubmitting={isSubmitting}
-          setIsSubmitting={setIsSubmitting}
-        />
+        <div className="p-4 md:p-5 shrink-0 bg-background">
+          <ChatInput 
+            input={input}
+            setInput={setInput}
+            isSubmitting={isSubmitting}
+            setIsSubmitting={setIsSubmitting}
+          />
+        </div>
       </div>
     </div>
   )
 }
-

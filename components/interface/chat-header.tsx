@@ -29,7 +29,7 @@ export function ChatHeader({ toggleSidebar, sidebarOpen }: ChatHeaderProps) {
   }
 
   return (
-    <div className="sticky top-0 z-50 h-16 bg-background border-b border-border flex items-center justify-between px-4 flex-shrink-0">
+    <div className="h-12 flex items-center justify-between px-6 border-b border-border shrink-0 bg-background transition-colors">
       <div className="flex items-center flex-shrink-0 min-w-0">
         {isMobile && (
           <Button variant="ghost" size="icon" onClick={toggleSidebar} className="mr-2 flex-shrink-0">
