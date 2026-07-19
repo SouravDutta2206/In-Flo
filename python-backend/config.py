@@ -15,9 +15,14 @@ CHUNK_OVERLAP = 80
 # Search/retrieval configuration
 TOP_K_RESULTS = 5
 
-# ChromaDB configuration
+# ChromaDB configuration (temporary file uploads)
 CHROMA_DB_PATH = "./chroma_db/file_upload"
 CHROMA_COLLECTION = "documents"
+
+# Persistent Document Bank configuration
+DOCUMENT_BANK_DB_PATH = "./chroma_db/document_banks"
+DOCUMENT_BANK_COLLECTION_PREFIX = "bank_"
+DOCUMENT_BANK_METADATA_PATH = "./data/document_banks.json"
 
 # Query expansion configuration
 ENABLE_QUERY_EXPANSION = True  # Master toggle for query expansion

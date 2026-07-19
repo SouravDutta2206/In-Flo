@@ -6,9 +6,20 @@
 /python-backend/hf_cache
 /python-backend/chroma_db
 /python-backend/.venv
+/python-backend/cache
 /python-backend/__pycache__
 /python-backend/utils/__pycache__
-/python-backend/__pycache__
+/python-backend/providers/__pycache__
+/python-backend/services/__pycache__
+/python-backend/services/banks/__pycache__
+/python-backend/services/chat/__pycache__
+/python-backend/services/file_upload/__pycache__
+/python-backend/services/web_search/__pycache__
+/python-backend/services/document_banks/__pycache__
+/python-backend/routes/__pycache__
+/python-backend/data
+
+
 
 # next.js
 /.next/

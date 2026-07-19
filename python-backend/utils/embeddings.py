@@ -21,7 +21,18 @@ class FastEmbedModel:
     
     def __init__(self, model_name: str = EMBEDDING_MODEL):
         providers = ["CUDAExecutionProvider"] if torch.cuda.is_available() else ["CPUExecutionProvider"]
-        self.model = TextEmbedding(model_name=model_name, providers=providers)
+        try:
+            # Try loading from local cache first to avoid checking online for updates
+            self.model = TextEmbedding(
+                model_name=model_name, providers=providers,
+                cache_dir='cache', local_files_only=True
+            )
+        except Exception:
+            # Fallback to downloading if not found or inaccessible locally
+            self.model = TextEmbedding(
+                model_name=model_name, providers=providers,
+                cache_dir='cache', local_files_only=False
+            )
     
     def encode(self, texts: list[str], **kwargs) -> np.ndarray:
         """Encode texts using FastEmbed."""

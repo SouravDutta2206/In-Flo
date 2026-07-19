@@ -5,15 +5,17 @@ import { Sidebar } from "@/components/interface/sidebar"
 import { ChatHeader } from "@/components/interface/chat-header"
 import { MessageList } from "@/components/messages/message-list"
 import { WelcomeScreen } from "@/components/interface/welcome-screen"
+import { DocumentBankSidebar } from "@/components/document-banks/sidebar"
 import { useMobile } from "@/hooks/use-mobile"
 import { useChat } from "@/context/chat-context"
 import { ChatInput } from "@/components/input-box/chat-input"
 
 /**
- * ChatInterface composes the overall layout: sidebar, header, message list, and input.
+ * ChatInterface composes the overall layout: sidebar, header, message list, input, and document bank sidebar.
  */
 export default function ChatInterface() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [bankSidebarOpen, setBankSidebarOpen] = useState(false)
   const [input, setInput] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const isMobile = useMobile()
@@ -21,6 +23,7 @@ export default function ChatInterface() {
 
   // Toggle the sidebar on mobile
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen)
+  const toggleBankSidebar = () => setBankSidebarOpen(!bankSidebarOpen)
 
   // Prefill the input when clicking a suggested sentence
   const handleSentenceClick = (sentence: string) => {
@@ -51,7 +54,12 @@ export default function ChatInterface() {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 relative z-10 transition-colors duration-300 bg-background">
-        <ChatHeader toggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
+        <ChatHeader
+          toggleSidebar={toggleSidebar}
+          sidebarOpen={sidebarOpen}
+          toggleBankSidebar={toggleBankSidebar}
+          bankSidebarOpen={bankSidebarOpen}
+        />
 
         <div className="flex-1 overflow-y-auto">
           <div className="w-full max-w-7xl mx-auto h-full flex flex-col px-4 pt-4 pb-8">
@@ -73,9 +81,13 @@ export default function ChatInterface() {
             setInput={setInput}
             isSubmitting={isSubmitting}
             setIsSubmitting={setIsSubmitting}
+            onBankIndicatorClick={toggleBankSidebar}
           />
         </div>
       </div>
+
+      {/* Document Bank Sidebar (right side) */}
+      <DocumentBankSidebar isOpen={bankSidebarOpen} onClose={() => setBankSidebarOpen(false)} />
     </div>
   )
 }

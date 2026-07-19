@@ -31,6 +31,12 @@ class ChatRequest(BaseModel):
     web_search: bool = False
     tavily_api_key: str = ""
     files: Optional[List[FileContext]] = None
+    document_banks: Optional[List["SelectedDocumentBank"]] = None
+
+class SelectedDocumentBank(BaseModel):
+    """A document bank selected for chat context."""
+    id: str
+    name: Optional[str] = None
 
 class SourcePath(BaseModel):
     path: str

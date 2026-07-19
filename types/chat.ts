@@ -44,3 +44,18 @@ export interface FileContext {
   chunks?: number   // Number of chunks stored in vector DB
   status?: string   // 'uploaded' when successfully processed
 }
+
+/** A persistent document bank with its files. */
+export interface DocumentBank {
+  id: string
+  name: string
+  files: { name: string; tokens: number; chunks: number; uploaded_at: string }[]
+  created_at: string
+  updated_at: string
+}
+
+/** A document bank selected for chat context. */
+export interface SelectedDocumentBank {
+  id: string
+  name: string
+}

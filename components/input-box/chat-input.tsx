@@ -6,7 +6,7 @@ import { ModelSelector } from "@/components/input-box/model-selector/model-selec
 import { FileManager } from "@/components/input-box/file-manager"
 import { useChat } from "@/context/chat-context"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowUp, Square, SearchIcon } from "lucide-react"
+import { ArrowUp, Square, SearchIcon, Library } from "lucide-react"
 import type { FileContext } from "@/types/chat"
 
 interface ChatInputProps {
@@ -14,13 +14,14 @@ interface ChatInputProps {
   setInput: (value: string) => void
   isSubmitting: boolean
   setIsSubmitting: (value: boolean) => void
+  onBankIndicatorClick?: () => void
 }
 
 /**
  * ChatInput manages the message text area, keyboard shortcuts, model selection, and send/stop actions.
  */
-export function ChatInput({ input, setInput, isSubmitting, setIsSubmitting }: ChatInputProps) {
-  const { sendMessage, currentChat, stopInference, isGenerating, isSearchMode, setIsSearchMode } = useChat()
+export function ChatInput({ input, setInput, isSubmitting, setIsSubmitting, onBankIndicatorClick }: ChatInputProps) {
+  const { sendMessage, currentChat, stopInference, isGenerating, isSearchMode, setIsSearchMode, selectedDocumentBanks } = useChat()
   const [historyIndex, setHistoryIndex] = useState<number>(-1)
   const [originalInput, setOriginalInput] = useState<string | null>(null)
   const [files, setFiles] = useState<FileContext[]>([])
@@ -129,6 +130,17 @@ export function ChatInput({ input, setInput, isSubmitting, setIsSubmitting }: Ch
                     <SearchIcon className="h-4 w-4" />
                     Web Search
                   </Button>
+                  {selectedDocumentBanks.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={onBankIndicatorClick}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors text-purple-400 bg-transparent hover:bg-muted/80"
+                    >
+                      <Library className="h-4 w-4" />
+                      {selectedDocumentBanks.length} bank{selectedDocumentBanks.length !== 1 ? "s" : ""}
+                    </Button>
+                  )}
                 </div>
                 <div>
                       {isGenerating ? (

@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { ChevronDown, ExternalLink, FileText } from "lucide-react"
+import { ChevronDown, ExternalLink, FileText, Library } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface Source {
@@ -20,6 +20,30 @@ interface SourcesFooterProps {
  */
 function isFileSource(url: string): boolean {
   return !url.startsWith('http://') && !url.startsWith('https://')
+}
+
+/**
+ * Checks if a source URL is a document bank source (bank://...).
+ */
+function isBankSource(url: string): boolean {
+  return url.startsWith('bank://')
+}
+
+/**
+ * Parses a bank source URL like "bank://Research Papers/document.pdf#page=3".
+ */
+function parseBankSource(url: string): { bankName: string; filename: string; page?: number } {
+  const withoutProtocol = url.replace('bank://', '')
+  const [pathPart, fragment] = withoutProtocol.split('#')
+  const slashIndex = pathPart.indexOf('/')
+  const bankName = slashIndex >= 0 ? pathPart.slice(0, slashIndex) : ''
+  const filename = slashIndex >= 0 ? pathPart.slice(slashIndex + 1) : pathPart
+  const pageMatch = fragment?.match(/page=(\d+)/)
+  return {
+    bankName,
+    filename,
+    page: pageMatch ? parseInt(pageMatch[1], 10) : undefined
+  }
 }
 
 /**
@@ -102,7 +126,9 @@ interface SourceCardProps {
 
 export function SourceCard({ id, source }: SourceCardProps) {
   const isFile = isFileSource(source.url)
-  const fileInfo = isFile ? parseFileSource(source.url) : null
+  const isBank = isBankSource(source.url)
+  const bankInfo = isBank ? parseBankSource(source.url) : null
+  const fileInfo = isFile && !isBank ? parseFileSource(source.url) : null
   
   const handleClick = () => {
     // Only open external links for web sources
@@ -111,7 +137,12 @@ export function SourceCard({ id, source }: SourceCardProps) {
     }
   }
 
-  const domain = isFile ? fileInfo?.filename : getDomain(source.url)
+  const domain = isBank
+    ? bankInfo?.filename
+    : isFile
+      ? fileInfo?.filename
+      : getDomain(source.url)
+  const page = isBank ? bankInfo?.page : fileInfo?.page
   const snippet = source.snippet?.slice(0, 100) || ''
 
   return (
@@ -125,6 +156,14 @@ export function SourceCard({ id, source }: SourceCardProps) {
         "group focus:outline-none focus:ring-2 focus:ring-primary/50"
       )}
     >
+      {/* Bank name label */}
+      {isBank && bankInfo?.bankName && (
+        <div className="flex items-center gap-1 mb-1">
+          <Library className="h-3 w-3 text-purple-400 flex-shrink-0" />
+          <span className="text-[10px] font-medium text-purple-400 truncate">{bankInfo.bankName}</span>
+        </div>
+      )}
+
       {/* Top row: [n] icon domain/filename | external link */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0 overflow-hidden flex-1">
@@ -150,10 +189,10 @@ export function SourceCard({ id, source }: SourceCardProps) {
         )}
       </div>
 
-      {/* Page number for file sources - displayed separately */}
-      {isFile && fileInfo?.page && (
+      {/* Page number for file/bank sources */}
+      {isFile && page && (
         <div className="flex items-center gap-1 mt-1 ml-6">
-          <span className="text-xs font-medium text-purple-400">Page {fileInfo.page}</span>
+          <span className="text-xs font-medium text-purple-400">Page {page}</span>
         </div>
       )}
 

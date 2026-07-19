@@ -61,7 +61,7 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
     request.conversation = filter_conversation(request.conversation)
     
     log.info(f"Provider: {request.model.provider} | Model: {request.model.name}")
-    log.info(f"Web Search: {request.web_search} | Files: {len(request.files or [])}")
+    log.info(f"Web Search: {request.web_search} | Files: {len(request.files or [])} | Banks: {len(request.document_banks or [])}")
 
     # Extract history and current message
     history = request.conversation[:-1]
@@ -78,7 +78,8 @@ async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
         model=request.model,
         files=request.files,
         web_search=request.web_search,
-        tavily_api_key=request.tavily_api_key
+        tavily_api_key=request.tavily_api_key,
+        document_banks=request.document_banks,
     )
 
     # Build final prompt

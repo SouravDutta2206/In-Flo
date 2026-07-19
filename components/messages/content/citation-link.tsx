@@ -14,10 +14,12 @@ interface CitationLinkProps {
  * Clicking opens the URL in a new tab.
  */
 export function CitationLink({ id, url, snippet }: CitationLinkProps) {
+  const isWebUrl = url?.startsWith('http://') || url?.startsWith('https://')
+
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    if (url) {
+    if (isWebUrl) {
       window.open(url, '_blank', 'noopener,noreferrer')
     }
   }

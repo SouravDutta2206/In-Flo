@@ -1,8 +1,8 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useEffect } from "react"
-import type { Chat, ChatMessage, Settings, FileContext } from "@/types/chat"
+import { createContext, useContext, useEffect, useState } from "react"
+import type { Chat, ChatMessage, Settings, FileContext, SelectedDocumentBank } from "@/types/chat"
 import { useChatSettings } from "@/context/hooks/use-chat-settings"
 import { useChatStorage } from "@/context/hooks/use-chat-storage"
 import { useChatStreaming } from "@/context/hooks/use-chat-streaming"
@@ -25,6 +25,8 @@ interface ChatContextType {
   isGenerating: boolean
   isSearchMode: boolean
   setIsSearchMode: (value: boolean) => void
+  selectedDocumentBanks: SelectedDocumentBank[]
+  setSelectedDocumentBanks: React.Dispatch<React.SetStateAction<SelectedDocumentBank[]>>
 }
 
 // React context containing chat state, settings, and chat operations
@@ -41,6 +43,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   // Initialize hooks
   const settingsHook = useChatSettings()
   const storageHook = useChatStorage()
+  const [selectedDocumentBanks, setSelectedDocumentBanks] = useState<SelectedDocumentBank[]>([])
 
   // Streaming hook depends on storage and settings
   const streamingHook = useChatStreaming({
@@ -55,6 +58,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     loadChats: async () => { await storageHook.loadChats(false) },
     selectChat: storageHook.selectChat,
     updateChatStorage: storageHook.updateChat,
+    selectedDocumentBanks,
   })
 
   // Initialize on mount: load chats and settings
@@ -90,6 +94,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     deleteMessagePair: streamingHook.deleteMessagePair,
     stopInference: streamingHook.stopInference,
     isGenerating: streamingHook.isGenerating,
+
+    // Document Banks
+    selectedDocumentBanks,
+    setSelectedDocumentBanks,
   }
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>

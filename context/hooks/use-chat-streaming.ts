@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef } from "react"
-import type { Chat, ChatMessage, Settings, FileContext } from "@/types/chat"
+import type { Chat, ChatMessage, Settings, FileContext, SelectedDocumentBank } from "@/types/chat"
 import { addMessageToChat, deleteChat, updateChat } from "@/app/actions/chat-actions"
 import { v4 as uuidv4 } from "uuid"
 import { streamSSE } from "@/lib/stream"
@@ -18,6 +18,7 @@ interface StreamingDeps {
   loadChats: () => Promise<void>
   selectChat: (id: string) => Promise<Chat | null>
   updateChatStorage: (chat: Chat) => Promise<void>
+  selectedDocumentBanks: SelectedDocumentBank[]
 }
 
 /**
@@ -55,6 +56,7 @@ export function useChatStreaming(deps: StreamingDeps) {
       getTavilyKey,
       createNewChat,
       loadChats,
+      selectedDocumentBanks,
     } = depsRef.current
 
     // Don't process empty content
@@ -120,6 +122,7 @@ export function useChatStreaming(deps: StreamingDeps) {
           web_search: isSearchMode,
           tavily_api_key: getTavilyKey(),
           files: files || null,
+          document_banks: selectedDocumentBanks.length > 0 ? selectedDocumentBanks : null,
         }),
         signal: controller.signal,
       })
