@@ -13,7 +13,7 @@ import {
 import { useChat } from "@/context/chat-context"
 import type { DocumentBank } from "@/types/chat"
 import { X, Plus, Loader2, Library, Info } from "lucide-react"
-import { isPdfFile } from "@/lib/utils"
+import { cn, isPdfFile } from "@/lib/utils"
 import { toast } from "sonner"
 import { DocumentBankRow } from "./row"
 
@@ -231,6 +231,38 @@ export function DocumentBankSidebar({ isOpen, onClose }: DocumentBankSidebarProp
               </Button>
             )}
           </div>
+
+          {/* Select All / Deselect All */}
+          {banks.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                const allSelected = banks.every(bank =>
+                  selectedDocumentBanks.some(b => b.id === bank.id)
+                )
+                if (allSelected) {
+                  setSelectedDocumentBanks([])
+                } else {
+                  setSelectedDocumentBanks(
+                    banks.map(bank => ({ id: bank.id, name: bank.name }))
+                  )
+                }
+              }}
+              className="flex w-full items-center gap-3 px-4 py-3 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/20 border-b border-border/50"
+            >
+              <span
+                className={cn(
+                  "h-4 w-4 shrink-0 rounded-full border transition-colors",
+                  banks.length > 0 && banks.every(bank => selectedDocumentBanks.some(b => b.id === bank.id))
+                    ? "border-purple-400 bg-purple-500 shadow-[0_0_0_3px_rgba(168,85,247,0.18)]"
+                    : "border-purple-500"
+                )}
+              />
+              {banks.length > 0 && banks.every(bank => selectedDocumentBanks.some(b => b.id === bank.id))
+                ? "Deselect All"
+                : "Select All"}
+            </button>
+          )}
 
           {isLoading && banks.length === 0 ? (
             <div className="flex items-center justify-center py-8">

@@ -6,7 +6,7 @@ import { ModelSelector } from "@/components/input-box/model-selector/model-selec
 import { FileManager } from "@/components/input-box/file-manager"
 import { useChat } from "@/context/chat-context"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowUp, Square, SearchIcon, Library } from "lucide-react"
+import { ArrowUp, Square, SearchIcon, Library, X } from "lucide-react"
 import type { FileContext } from "@/types/chat"
 
 interface ChatInputProps {
@@ -21,7 +21,7 @@ interface ChatInputProps {
  * ChatInput manages the message text area, keyboard shortcuts, model selection, and send/stop actions.
  */
 export function ChatInput({ input, setInput, isSubmitting, setIsSubmitting, onBankIndicatorClick }: ChatInputProps) {
-  const { sendMessage, currentChat, stopInference, isGenerating, isSearchMode, setIsSearchMode, selectedDocumentBanks } = useChat()
+  const { sendMessage, currentChat, stopInference, isGenerating, isSearchMode, setIsSearchMode, selectedDocumentBanks, setSelectedDocumentBanks } = useChat()
   const [historyIndex, setHistoryIndex] = useState<number>(-1)
   const [originalInput, setOriginalInput] = useState<string | null>(null)
   const [files, setFiles] = useState<FileContext[]>([])
@@ -109,7 +109,7 @@ export function ChatInput({ input, setInput, isSubmitting, setIsSubmitting, onBa
                 disabled={isSubmitting}
               />
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-2">
                   <FileManager 
                     files={files} 
                     setFiles={setFiles}
@@ -131,15 +131,26 @@ export function ChatInput({ input, setInput, isSubmitting, setIsSubmitting, onBa
                     Web Search
                   </Button>
                   {selectedDocumentBanks.length > 0 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
+                    <div
                       onClick={onBankIndicatorClick}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md transition-colors text-purple-400 bg-transparent hover:bg-muted/80"
+                      className="group flex items-center gap-2 h-10 px-3 py-1.5 text-sm font-medium rounded-md transition-colors text-purple-400 bg-transparent hover:bg-muted/80 shrink-0 whitespace-nowrap cursor-pointer"
                     >
-                      <Library className="h-4 w-4" />
-                      {selectedDocumentBanks.length} bank{selectedDocumentBanks.length !== 1 ? "s" : ""}
-                    </Button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedDocumentBanks([])
+                        }}
+                        className="group/bank-icon flex items-center justify-center p-0.5 transition-colors"
+                        title="Clear all selected banks"
+                      >
+                        <Library className="h-4 w-4 shrink-0 group-hover/bank-icon:hidden" />
+                        <X className="h-4 w-4 shrink-0 hidden group-hover/bank-icon:block text-red-400" />
+                      </button>
+                      <span>
+                        {selectedDocumentBanks.length} bank{selectedDocumentBanks.length !== 1 ? "s" : ""}
+                      </span>
+                    </div>
                   )}
                 </div>
                 <div>
