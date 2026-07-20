@@ -1,17 +1,46 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet"
 import { useChat } from "@/context/chat-context"
 import type { DocumentBank } from "@/types/chat"
 import { X, Plus, Loader2, Library, Info } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { isPdfFile } from "@/lib/utils"
+import { toast } from "sonner"
 import { DocumentBankRow } from "./row"
 
 interface DocumentBankSidebarProps {
   isOpen: boolean
   onClose: () => void
+}
+
+/** Wrapper around fetch that throws on non-OK responses and shows a toast. */
+async function apiFetch<T = unknown>(
+  url: string,
+  init?: RequestInit,
+  errorLabel = "Request failed",
+): Promise<T | null> {
+  try {
+    const res = await fetch(url, init)
+    if (!res.ok) {
+      toast.error(`${errorLabel}: ${res.statusText}`)
+      return null
+    }
+    // Some endpoints (DELETE) return 204 with no body
+    const text = await res.text()
+    return text ? (JSON.parse(text) as T) : (null as unknown as T)
+  } catch (err) {
+    toast.error(`${errorLabel}: ${err instanceof Error ? err.message : "Network error"}`)
+    return null
+  }
 }
 
 /**
@@ -27,91 +56,74 @@ export function DocumentBankSidebar({ isOpen, onClose }: DocumentBankSidebarProp
   const [isCreating, setIsCreating] = useState(false)
   const [expandedBankId, setExpandedBankId] = useState<string | null>(null)
   const [uploadingBankId, setUploadingBankId] = useState<string | null>(null)
-  const sidebarRef = useRef<HTMLDivElement>(null)
 
   // Fetch banks on mount and when sidebar opens
   const fetchBanks = useCallback(async () => {
-    try {
-      setIsLoading(true)
-      const res = await fetch("/api/document-banks")
-      if (res.ok) {
-        const data = await res.json()
-        setBanks(data)
-      }
-    } catch (err) {
-      console.error("Error fetching banks:", err)
-    } finally {
-      setIsLoading(false)
-    }
+    setIsLoading(true)
+    const data = await apiFetch<DocumentBank[]>(
+      "/api/document-banks",
+      undefined,
+      "Failed to load document banks",
+    )
+    if (data) setBanks(data)
+    setIsLoading(false)
   }, [])
 
   useEffect(() => {
     if (isOpen) fetchBanks()
   }, [isOpen, fetchBanks])
 
-  useEffect(() => {
-    if (!isOpen) return
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!sidebarRef.current?.contains(event.target as Node)) {
-        onClose()
-      }
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown)
-    return () => document.removeEventListener("pointerdown", handlePointerDown)
-  }, [isOpen, onClose])
-
   // Create bank
   const handleCreateBank = async () => {
     const name = newBankName.trim()
     if (!name) return
     setIsCreating(true)
-    try {
-      const res = await fetch("/api/document-banks", {
+    const result = await apiFetch(
+      "/api/document-banks",
+      {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
-      })
-      if (res.ok) {
-        setNewBankName("")
-        setIsCreateOpen(false)
-        await fetchBanks()
-      }
-    } catch (err) {
-      console.error("Error creating bank:", err)
-    } finally {
-      setIsCreating(false)
+      },
+      "Failed to create bank",
+    )
+    if (result !== null) {
+      setNewBankName("")
+      setIsCreateOpen(false)
+      await fetchBanks()
     }
+    setIsCreating(false)
   }
 
   // Delete bank
   const handleDeleteBank = async (bankId: string) => {
-    try {
-      await fetch(`/api/document-banks/${bankId}`, { method: "DELETE" })
+    const result = await apiFetch(
+      `/api/document-banks/${bankId}`,
+      { method: "DELETE" },
+      "Failed to delete bank",
+    )
+    if (result !== null) {
       setSelectedDocumentBanks(prev => prev.filter(b => b.id !== bankId))
       await fetchBanks()
-    } catch (err) {
-      console.error("Error deleting bank:", err)
     }
   }
 
   // Rename bank
   const handleRename = async (bankId: string, name: string) => {
-    try {
-      const res = await fetch(`/api/document-banks/${bankId}`, {
+    const result = await apiFetch(
+      `/api/document-banks/${bankId}`,
+      {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
-      })
-      if (res.ok) {
-        setSelectedDocumentBanks(prev =>
-          prev.map(b => b.id === bankId ? { ...b, name } : b)
-        )
-        await fetchBanks()
-      }
-    } catch (err) {
-      console.error("Error renaming bank:", err)
+      },
+      "Failed to rename bank",
+    )
+    if (result !== null) {
+      setSelectedDocumentBanks(prev =>
+        prev.map(b => b.id === bankId ? { ...b, name } : b)
+      )
+      await fetchBanks()
     }
   }
 
@@ -129,66 +141,49 @@ export function DocumentBankSidebar({ isOpen, onClose }: DocumentBankSidebarProp
   // Upload file to bank
   const handleFileUpload = async (bankId: string, files: FileList) => {
     setUploadingBankId(bankId)
-    try {
-      for (const file of Array.from(files)) {
-        if (!file.name.toLowerCase().endsWith(".pdf")) continue
-        const formData = new FormData()
-        formData.append("file", file)
-        await fetch(`/api/document-banks/${bankId}/files`, {
-          method: "POST",
-          body: formData,
-        })
-      }
-      await fetchBanks()
-    } catch (err) {
-      console.error("Error uploading file:", err)
-    } finally {
-      setUploadingBankId(null)
+    for (const file of Array.from(files)) {
+      if (!isPdfFile(file)) continue
+      const formData = new FormData()
+      formData.append("file", file)
+      await apiFetch(
+        `/api/document-banks/${bankId}/files`,
+        { method: "POST", body: formData },
+        `Failed to upload ${file.name}`,
+      )
     }
+    await fetchBanks()
+    setUploadingBankId(null)
   }
 
   // Delete file from bank
   const handleDeleteFile = async (bankId: string, filename: string) => {
-    try {
-      await fetch(`/api/document-banks/${bankId}/files/${encodeURIComponent(filename)}`, {
-        method: "DELETE",
-      })
+    const result = await apiFetch(
+      `/api/document-banks/${bankId}/files/${encodeURIComponent(filename)}`,
+      { method: "DELETE" },
+      `Failed to delete ${filename}`,
+    )
+    if (result !== null) {
       await fetchBanks()
-    } catch (err) {
-      console.error("Error deleting file:", err)
     }
   }
 
   return (
-    <>
-      {/* Backdrop */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-40 md:hidden"
-          onClick={onClose}
-        />
-      )}
-
-      {/* Sidebar panel */}
-      <div
-        ref={sidebarRef}
-        className={cn(
-          "fixed inset-y-0 right-0 z-50 w-80 bg-card border-l border-border",
-          "transform transition-transform duration-300 ease-in-out",
-          "flex flex-col shadow-2xl",
-          isOpen ? "translate-x-0" : "translate-x-full"
-        )}
+    <Sheet open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
+      <SheetContent
+        side="right"
+        className="w-80 p-0 flex flex-col bg-card border-l border-border shadow-2xl [&>button:last-of-type]:hidden"
       >
         {/* Header */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-border shrink-0">
+        <SheetHeader className="flex-row items-center justify-between h-16 px-4 border-b border-border shrink-0 space-y-0">
           <div className="flex items-center gap-2">
             <Library className="h-5 w-5 text-purple-400" />
-            <h2 className="font-semibold text-xl tracking-normal">Document Banks</h2>
+            <SheetTitle className="font-semibold text-xl tracking-normal">Document Banks</SheetTitle>
           </div>
+          <SheetDescription className="sr-only">Manage your document bank collections</SheetDescription>
           <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
           </Button>
-        </div>
+        </SheetHeader>
 
         <div className="flex-1 overflow-y-auto">
           {/* Create bank */}
@@ -275,7 +270,7 @@ export function DocumentBankSidebar({ isOpen, onClose }: DocumentBankSidebarProp
             </p>
           </div>
         </div>
-      </div>
-    </>
+      </SheetContent>
+    </Sheet>
   )
 }

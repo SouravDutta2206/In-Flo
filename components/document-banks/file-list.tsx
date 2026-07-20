@@ -2,17 +2,13 @@ import { useRef } from "react"
 import { Button } from "@/components/ui/button"
 import type { DocumentBank } from "@/types/chat"
 import { FileText, Loader2, Upload, X } from "lucide-react"
+import { formatTokens } from "@/lib/utils"
 
 interface DocumentBankFileListProps {
   bank: DocumentBank
   isUploading: boolean
   onUpload: (files: FileList) => void
   onDeleteFile: (filename: string) => void
-}
-
-function formatTokens(tokens: number) {
-  if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}k`
-  return tokens.toString()
 }
 
 /**

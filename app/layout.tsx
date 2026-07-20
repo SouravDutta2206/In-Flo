@@ -4,6 +4,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/interface/theme-provider"
 import { ChatProvider } from "@/context/chat-context"
+import { Toaster } from "@/components/ui/sonner"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -23,9 +24,9 @@ export default function RootLayout({
       <body className={inter.className} suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <ChatProvider>{children}</ChatProvider>
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>
   )
 }
-

@@ -4,7 +4,7 @@ import { useRef, useState, useEffect } from "react"
 import type { FileContext } from "@/types/chat"
 import { Button } from "@/components/ui/button"
 import { X, FileText, Loader2, ChevronUp, Trash2 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, isPdfFile } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface FileManagerProps {
@@ -47,7 +47,7 @@ export function FileManager({ files, setFiles, isUploading, setIsUploading }: Fi
     try {
       for (const file of Array.from(selectedFiles)) {
         // Skip non-PDF files
-        if (!file.name.toLowerCase().endsWith('.pdf')) {
+        if (!isPdfFile(file)) {
           console.error(`Skipping non-PDF file: ${file.name}`)
           continue
         }

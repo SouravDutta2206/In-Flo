@@ -1,11 +1,11 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { DocumentBank } from "@/types/chat"
 import {
   X, Trash2, ChevronDown, Pencil, Check,
 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, formatTokens } from "@/lib/utils"
 import { DocumentBankFileList } from "./file-list"
 
 interface DocumentBankRowProps {
@@ -19,11 +19,6 @@ interface DocumentBankRowProps {
   onRename: (name: string) => Promise<void>
   onUpload: (files: FileList) => void
   onDeleteFile: (filename: string) => void
-}
-
-function formatTokens(tokens: number) {
-  if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}k`
-  return tokens.toString()
 }
 
 /**
@@ -59,7 +54,10 @@ export function DocumentBankRow({
   }
 
   const cancelEditing = () => setIsEditing(false)
-  const tokenCount = bank.files.reduce((total, file) => total + file.tokens, 0)
+  const tokenCount = useMemo(
+    () => bank.files.reduce((total, file) => total + file.tokens, 0),
+    [bank.files]
+  )
 
   return (
     <div className="border-b border-border/50">
@@ -77,7 +75,7 @@ export function DocumentBankRow({
           )}
         />
         {isEditing ? (
-          <div className="flex min-w-0 flex-1 items-center gap-1">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             <Input
               value={editingName}
               onChange={(e) => setEditingName(e.target.value)}
