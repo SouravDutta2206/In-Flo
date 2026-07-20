@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useChat } from "@/context/chat-context"
 import type { DocumentBank } from "@/types/chat"
-import { X, Plus, Loader2, Library } from "lucide-react"
+import { X, Plus, Loader2, Library, Info } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DocumentBankRow } from "./row"
 
@@ -23,6 +23,7 @@ export function DocumentBankSidebar({ isOpen, onClose }: DocumentBankSidebarProp
   const [banks, setBanks] = useState<DocumentBank[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [newBankName, setNewBankName] = useState("")
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [expandedBankId, setExpandedBankId] = useState<string | null>(null)
   const [uploadingBankId, setUploadingBankId] = useState<string | null>(null)
@@ -48,6 +49,19 @@ export function DocumentBankSidebar({ isOpen, onClose }: DocumentBankSidebarProp
     if (isOpen) fetchBanks()
   }, [isOpen, fetchBanks])
 
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!sidebarRef.current?.contains(event.target as Node)) {
+        onClose()
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown)
+    return () => document.removeEventListener("pointerdown", handlePointerDown)
+  }, [isOpen, onClose])
+
   // Create bank
   const handleCreateBank = async () => {
     const name = newBankName.trim()
@@ -61,6 +75,7 @@ export function DocumentBankSidebar({ isOpen, onClose }: DocumentBankSidebarProp
       })
       if (res.ok) {
         setNewBankName("")
+        setIsCreateOpen(false)
         await fetchBanks()
       }
     } catch (err) {
@@ -165,39 +180,63 @@ export function DocumentBankSidebar({ isOpen, onClose }: DocumentBankSidebarProp
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+        <div className="flex items-center justify-between h-16 px-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             <Library className="h-5 w-5 text-purple-400" />
-            <h2 className="font-semibold text-sm">Document Banks</h2>
+            <h2 className="font-semibold text-xl tracking-normal">Document Banks</h2>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-7 w-7">
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
           </Button>
         </div>
 
-        {/* Create bank */}
-        <div className="px-4 py-3 border-b border-border shrink-0">
-          <div className="flex gap-2">
-            <Input
-              placeholder="New bank name..."
-              value={newBankName}
-              onChange={(e) => setNewBankName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleCreateBank()}
-              className="h-8 text-sm bg-background"
-            />
-            <Button
-              size="sm"
-              onClick={handleCreateBank}
-              disabled={!newBankName.trim() || isCreating}
-              className="h-8 px-3 bg-purple-600 hover:bg-purple-700 text-white shrink-0"
-            >
-              {isCreating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-            </Button>
-          </div>
-        </div>
-
-        {/* Bank list */}
         <div className="flex-1 overflow-y-auto">
+          {/* Create bank */}
+          <div className="px-4 py-4 border-b border-border">
+            {isCreateOpen ? (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold">New Document Bank</h3>
+                <Input
+                  placeholder="Bank Name (e.g. Finance)"
+                  value={newBankName}
+                  onChange={(e) => setNewBankName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCreateBank()}
+                  className="h-8 rounded-full border-border bg-background/50 px-4 text-sm"
+                  autoFocus
+                />
+                <div className="flex items-center justify-end gap-3 pt-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setNewBankName("")
+                      setIsCreateOpen(false)
+                    }}
+                    className="h-8 px-2 text-sm font-semibold hover:bg-transparent"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleCreateBank}
+                    disabled={!newBankName.trim() || isCreating}
+                    className="h-8 rounded-full bg-purple-600 px-4 text-sm font-semibold text-white hover:bg-purple-700"
+                  >
+                    {isCreating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Create"}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                onClick={() => setIsCreateOpen(true)}
+                className="h-10 w-full rounded-full bg-purple-600 text-sm font-semibold text-white hover:bg-purple-700"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Create Document Bank
+              </Button>
+            )}
+          </div>
+
           {isLoading && banks.length === 0 ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -225,12 +264,17 @@ export function DocumentBankSidebar({ isOpen, onClose }: DocumentBankSidebarProp
           )}
         </div>
 
-        {/* Footer showing selected count */}
-        {selectedDocumentBanks.length > 0 && (
-          <div className="px-4 py-2.5 border-t border-border text-xs text-muted-foreground shrink-0 bg-purple-500/10">
-            <span className="text-purple-400 font-medium">{selectedDocumentBanks.length}</span> bank{selectedDocumentBanks.length !== 1 ? "s" : ""} selected for chat context
+        <div className="shrink-0 border-t border-border bg-card">
+          <div className="px-4 pb-2 pt-2 text-xs text-muted-foreground">
+            <span className="font-medium text-purple-400">{selectedDocumentBanks.length}</span> active bank{selectedDocumentBanks.length !== 1 ? "s" : ""}
           </div>
-        )}
+          <div className="flex gap-3 border-t border-border px-4 py-4 text-xs leading-5 text-muted-foreground">
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-purple-400" />
+            <p>
+              Check a bank to make its document collection active for subsequent prompts in the current chat. Active banks will be queried semantically.
+            </p>
+          </div>
+        </div>
       </div>
     </>
   )

@@ -28,31 +28,31 @@ export function DocumentBankFileList({
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   return (
-    <div className="bg-muted/20 px-3 pb-2">
+    <div className="px-4 pb-4 pt-2">
       {bank.files.length === 0 ? (
-        <p className="text-xs text-muted-foreground py-2 pl-8">No files yet</p>
+        <p className="py-2 pl-7 text-xs text-muted-foreground">No files yet</p>
       ) : (
-        bank.files.map((file) => (
-          <div
-            key={file.name}
-            className="flex items-center gap-2 py-1.5 pl-8 pr-1 group/file hover:bg-muted/30 rounded"
-          >
-            <FileText className="h-3.5 w-3.5 text-purple-400 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <div className="text-xs truncate" title={file.name}>{file.name}</div>
-              <div className="text-[10px] text-muted-foreground">
-                {formatTokens(file.tokens)} tokens · {file.chunks} chunks
-              </div>
-            </div>
-            <Button
-              variant="ghost" size="icon"
-              className="h-5 w-5 opacity-0 group-hover/file:opacity-100 hover:text-red-400 shrink-0"
-              onClick={() => onDeleteFile(file.name)}
+        <div className="space-y-2">
+          {bank.files.map((file) => (
+            <div
+              key={file.name}
+              className="group/file flex h-9 items-center gap-2 rounded-full bg-muted/40 px-3 transition-colors hover:bg-muted/60"
             >
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-        ))
+              <FileText className="h-3.5 w-3.5 shrink-0 text-purple-400" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-xs font-medium" title={file.name}>{file.name}</div>
+              </div>
+              <span className="shrink-0 text-[11px] text-muted-foreground">{formatTokens(file.tokens)} t</span>
+              <Button
+                variant="ghost" size="icon"
+                className="h-6 w-6 shrink-0 text-muted-foreground hover:text-red-400"
+                onClick={() => onDeleteFile(file.name)}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
       )}
 
       {/* Upload button */}
@@ -68,14 +68,14 @@ export function DocumentBankFileList({
       />
       <Button
         variant="ghost"
-        className="w-full mt-1 h-7 text-xs text-muted-foreground hover:text-foreground justify-start pl-8"
+        className="mt-3 h-8 w-full rounded-full border border-dashed border-border text-xs font-semibold text-foreground hover:bg-muted/30"
         onClick={() => fileInputRef.current?.click()}
         disabled={isUploading}
       >
         {isUploading ? (
           <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> Uploading...</>
         ) : (
-          <><Upload className="h-3 w-3 mr-1.5" /> Upload PDFs</>
+          <><Upload className="h-3.5 w-3.5 mr-1.5 text-purple-400" /> Add PDF to Bank</>
         )}
       </Button>
     </div>
