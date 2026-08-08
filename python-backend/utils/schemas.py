@@ -47,14 +47,22 @@ class ChatResponse(BaseModel):
     content: str
     sources: List[SourcePath]
 
-class ModelID(BaseModel):
-    id : str
+class ModelCapabilities(BaseModel):
+    input: List[str]
+    output: List[str]
 
-class ModelRequest(BaseModel):
-    api_key: str
+class AvailableModel(BaseModel):
+    name: str
+    model_id: str
+    provider: str
+    capabilities: ModelCapabilities
 
-class ModelResponse(BaseModel):
-    data: List[ModelID]
+class ModelsRequest(BaseModel):
+    groq_api_key: Optional[str] = None
+    gemini_api_key: Optional[str] = None
+
+class ModelsResponse(BaseModel):
+    data: List[AvailableModel]
 
 class RequestState:
     def __init__(self, request_id: int, app: FastAPI):

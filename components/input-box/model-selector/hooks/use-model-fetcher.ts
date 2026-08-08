@@ -1,101 +1,64 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import type { Settings } from "@/types/chat"
-import type { Model, ModelResponse, GroupedModels, LogoProvider } from "@/types/models"
+import type { Model, ModelsResponse, GroupedModels } from "@/types/models"
 
-/** Provider configuration for fetching models */
-interface ProviderConfig {
-  name: string
-  requiresApiKey: boolean
-  settingsKey?: string // Key to look up in settings.providers
-}
-
-const PROVIDER_CONFIGS: ProviderConfig[] = [
-  { name: "Ollama", requiresApiKey: false },
-  { name: "OpenRouter", requiresApiKey: false },
-  { name: "Groq", requiresApiKey: true, settingsKey: "Groq" },
-  { name: "Gemini", requiresApiKey: true, settingsKey: "Gemini" },
-]
+/** How long (ms) before cached models are considered stale. */
+const STALE_MS = 60_000
 
 /**
- * Generic model fetcher for any provider.
- * Handles both GET (no API key) and POST (with API key) requests.
- */
-async function fetchModelsFromProvider(
-  provider: string,
-  apiKey?: string
-): Promise<Model[]> {
-  const url = `/api/models/${provider.toLowerCase()}`
-
-  try {
-    const response = apiKey
-      ? await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ api_key: apiKey }),
-        })
-      : await fetch(url)
-
-    if (!response.ok) {
-      console.warn(`Failed to fetch ${provider} models, proceeding without them.`)
-      return []
-    }
-
-    const data = await response.json()
-
-    // Handle different response formats (OpenRouter/Groq/Gemini use .data, Ollama uses .models)
-    const models = data.data || data.models || []
-    return models.map((model: { id?: string; name?: string }) => ({
-      name: model.id || model.name || "",
-      provider,
-    }))
-  } catch (error) {
-    console.error(`Error fetching ${provider} models:`, error)
-    return []
-  }
-}
-
-/**
- * Hook for fetching models from all providers and managing logo data.
+ * Hook for fetching models from the aggregate backend endpoint.
+ * Uses lazy fetching — models are only loaded when `fetchIfStale()` is called
+ * (typically on popover open) and cached for STALE_MS.
  */
 export function useModelFetcher(settings: Settings) {
   const [groupedModels, setGroupedModels] = useState<GroupedModels>({})
-  const [isLoading, setIsLoading] = useState(true)
-  const [logoMap, setLogoMap] = useState<LogoProvider[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const lastFetchRef = useRef<number>(0)
 
-  // Fetch logo data on mount
-  useEffect(() => {
-    const fetchLogos = async () => {
-      try {
-        const response = await fetch("/data/logos.json")
-        if (!response.ok) {
-          console.warn("Failed to fetch logos.json. Status:", response.status)
-          return
-        }
-        const data = await response.json()
-        setLogoMap(data.providers || [])
-      } catch (error) {
-        console.error("Error fetching logos:", error)
+  /** Extract API keys from settings to pass to the aggregate endpoint. */
+  const getApiKeys = useCallback(() => {
+    const keys: { groq_api_key?: string; gemini_api_key?: string } = {}
+
+    for (const provider of settings.providers) {
+      if (provider.Provider === "Groq" && provider.Key) {
+        keys.groq_api_key = provider.Key
+      }
+      if (provider.Provider === "Gemini" && provider.Key) {
+        keys.gemini_api_key = provider.Key
       }
     }
-    fetchLogos()
-  }, [])
 
-  /** Get API key for a provider from settings */
-  const getApiKeyForProvider = useCallback(
-    (providerName: string): string | undefined => {
-      const provider = settings.providers.find((p) => p.Provider === providerName)
-      return provider?.Key || undefined
-    },
-    [settings.providers]
-  )
+    return keys
+  }, [settings.providers])
 
-  /** Load all models from settings and provider APIs. */
+  /** Load all models via the single aggregate endpoint. */
   const loadAllModels = useCallback(async () => {
     setIsLoading(true)
     try {
-      // Models from settings (non-API providers)
+      const apiKeys = getApiKeys()
+
+      // Single aggregate fetch
+      let fetchedModels: Model[] = []
+      try {
+        const response = await fetch("/api/models", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(apiKeys),
+        })
+
+        if (response.ok) {
+          const data: ModelsResponse = await response.json()
+          fetchedModels = data.data || []
+        } else {
+          console.warn("Failed to fetch aggregate models, proceeding with settings models only.")
+        }
+      } catch (error) {
+        console.error("Error fetching aggregate models:", error)
+      }
+
+      // Merge in manual settings models as fallback rich records
       const settingsModels: Model[] = []
       settings.providers.forEach((provider) => {
         if (provider.Models && provider.Provider !== "OpenRouter") {
@@ -103,33 +66,36 @@ export function useModelFetcher(settings: Settings) {
             .map((m) => m.trim())
             .filter((name) => name)
           modelNames.forEach((name) => {
-            settingsModels.push({ name, provider: provider.Provider })
+            settingsModels.push({
+              name,
+              model_id: name,
+              provider: provider.Provider.toLowerCase(),
+              capabilities: { input: ["text"], output: ["text"] },
+            })
           })
         }
       })
 
-      // Fetch from all configured providers in parallel
-      const fetchPromises = PROVIDER_CONFIGS.map((config) => {
-        const apiKey = config.requiresApiKey
-          ? getApiKeyForProvider(config.settingsKey || config.name)
-          : undefined
-
-        // Skip providers that need API keys but don't have one
-        if (config.requiresApiKey && !apiKey) {
-          console.warn(`No ${config.name} API key found in settings, skipping.`)
-          return Promise.resolve([])
+      // Combine and deduplicate by provider:model_id
+      const allModels = [...fetchedModels, ...settingsModels]
+      const seen = new Set<string>()
+      const deduped: Model[] = []
+      for (const model of allModels) {
+        const normalizedProvider = model.provider.toLowerCase()
+        const key = `${normalizedProvider}:${model.model_id}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          deduped.push({
+            ...model,
+            provider: normalizedProvider,
+          })
         }
-
-        return fetchModelsFromProvider(config.name, apiKey)
-      })
-
-      const results = await Promise.all(fetchPromises)
-      const allModels = [...settingsModels, ...results.flat()]
+      }
 
       // Group by provider
       const grouped: GroupedModels = {}
-      allModels.forEach((model) => {
-        const providerKey = model.provider || "Unknown"
+      deduped.forEach((model) => {
+        const providerKey = model.provider
         if (!grouped[providerKey]) {
           grouped[providerKey] = []
         }
@@ -137,27 +103,37 @@ export function useModelFetcher(settings: Settings) {
       })
 
       setGroupedModels(grouped)
+      lastFetchRef.current = Date.now()
     } finally {
       setIsLoading(false)
     }
-  }, [settings.providers, getApiKeyForProvider])
+  }, [settings.providers, getApiKeys])
 
-  // Reload models when settings change
+  // Eager-fetch on mount and when settings change, so data is ready before user clicks
   useEffect(() => {
     loadAllModels()
   }, [loadAllModels])
+
+  /** Fetch models only if data is absent or stale. */
+  const fetchIfStale = useCallback(async () => {
+    const isEmpty = Object.keys(groupedModels).length === 0
+    const isStale = Date.now() - lastFetchRef.current > STALE_MS
+    if (isEmpty || isStale) {
+      await loadAllModels()
+    }
+  }, [loadAllModels, groupedModels])
 
   /** Get providers that have at least one model. */
   const getProviders = useCallback(() => {
     return Object.keys(groupedModels).filter((p) => groupedModels[p].length > 0)
   }, [groupedModels])
 
-  /** Find provider for the active model. */
+  /** Find provider for the active model (matches by model_id). */
   const getActiveModelProvider = useCallback(
     (activeModel?: string) => {
       if (!activeModel) return null
       for (const [provider, models] of Object.entries(groupedModels)) {
-        if (models.some((m) => m.name === activeModel)) {
+        if (models.some((m) => m.model_id === activeModel)) {
           return provider
         }
       }
@@ -169,9 +145,9 @@ export function useModelFetcher(settings: Settings) {
   return {
     groupedModels,
     isLoading,
-    logoMap,
     getProviders,
     getActiveModelProvider,
+    fetchIfStale,
     refetch: loadAllModels,
   }
 }

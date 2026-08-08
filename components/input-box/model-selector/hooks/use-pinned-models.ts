@@ -2,8 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react"
 
+const STORAGE_KEY = "pinnedModels"
+
 /**
  * Hook for managing pinned models with localStorage persistence.
+ * Uses provider-aware keys: `${provider}:${model_id}`.
  */
 export function usePinnedModels() {
   const [pinnedModels, setPinnedModels] = useState<string[]>([])
@@ -12,19 +15,19 @@ export function usePinnedModels() {
   // Load pinned models from localStorage on mount
   useEffect(() => {
     setMounted(true)
-    const storedPinnedModels = localStorage.getItem("pinnedModels")
-    if (storedPinnedModels) {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) {
       try {
-        const parsedModels = JSON.parse(storedPinnedModels)
-        if (Array.isArray(parsedModels)) {
-          setPinnedModels(parsedModels)
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed)) {
+          setPinnedModels(parsed)
         } else {
           console.warn("Invalid pinned models format in localStorage")
-          localStorage.removeItem("pinnedModels")
+          localStorage.removeItem(STORAGE_KEY)
         }
       } catch (error) {
         console.error("Error parsing pinned models from localStorage:", error)
-        localStorage.removeItem("pinnedModels")
+        localStorage.removeItem(STORAGE_KEY)
       }
     }
   }, [])
@@ -32,26 +35,31 @@ export function usePinnedModels() {
   // Persist pinned models to localStorage when they change
   useEffect(() => {
     if (mounted) {
-      localStorage.setItem("pinnedModels", JSON.stringify(pinnedModels))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(pinnedModels))
     }
   }, [pinnedModels, mounted])
 
   /** Toggle pin status of a model. */
-  const togglePin = useCallback((modelName: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation()
-    
-    setPinnedModels((prev) => {
-      if (prev.includes(modelName)) {
-        return prev.filter((name) => name !== modelName)
-      } else {
-        return [...prev, modelName]
-      }
-    })
-  }, [])
+  const togglePin = useCallback(
+    (provider: string, modelId: string, e?: React.MouseEvent) => {
+      if (e) e.stopPropagation()
+      const key = `${provider}:${modelId}`
+
+      setPinnedModels((prev) => {
+        if (prev.includes(key)) {
+          return prev.filter((k) => k !== key)
+        } else {
+          return [...prev, key]
+        }
+      })
+    },
+    []
+  )
 
   /** Check if a model is pinned. */
   const isPinned = useCallback(
-    (modelName: string) => pinnedModels.includes(modelName),
+    (provider: string, modelId: string) =>
+      pinnedModels.includes(`${provider}:${modelId}`),
     [pinnedModels]
   )
 

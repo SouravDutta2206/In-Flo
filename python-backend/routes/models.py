@@ -1,29 +1,33 @@
 """
-Models routes - handles model listing endpoints.
+Models routes - single aggregate endpoint for all providers.
 """
 from fastapi import APIRouter, HTTPException
 
-from utils.schemas import ModelResponse, ModelRequest, ModelID
-from utils.model_list import get_gemini_models_list, get_groq_models_list
+from utils.schemas import ModelsRequest, ModelsResponse, AvailableModel, ModelCapabilities
+from utils.fetch_models import get_models_list
 
 router = APIRouter(tags=["models"])
 
 
-@router.post("/api/gemini/models")
-async def get_gemini_models(request: ModelRequest):
-    """Get available Gemini models."""
+@router.post("/api/models", response_model=ModelsResponse)
+async def get_models(request: ModelsRequest):
+    """Get available models from all providers in one call."""
     try:
-        models = get_gemini_models_list(api_key=request.api_key)
-        return ModelResponse(data=[ModelID(id=model) for model in models])
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raw = await get_models_list(
+            groq_api_key=request.groq_api_key,
+            gemini_api_key=request.gemini_api_key,
+        )
 
+        models = [
+            AvailableModel(
+                name=m["name"],
+                model_id=m["model_id"],
+                provider=m["provider"],
+                capabilities=ModelCapabilities(**m["capabilities"]),
+            )
+            for m in raw
+        ]
 
-@router.post("/api/groq/models")
-async def get_groq_models(request: ModelRequest):
-    """Get available Groq models."""
-    try:
-        models = get_groq_models_list(api_key=request.api_key)
-        return ModelResponse(data=[ModelID(id=model.get('id')) for model in models])
+        return ModelsResponse(data=models)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
